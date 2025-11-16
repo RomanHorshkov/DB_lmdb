@@ -2,16 +2,17 @@
  * @file db_lmdb_dbi.h
  * @brief Thin descriptor for LMDB named sub-databases.
  *
- * Stores the DBI handle plus cached flags so callers do not need to
- * re-query lmdb_dbi_flags() in hot paths.
+ * The types and helpers in this header provide a small, efficient
+ * abstraction over LMDB named databases (DBIs). They cache the LMDB
+ * handle and commonly-used flags so hot-path code can avoid repeated
+ * flag queries and type checks.
  */
 
 #ifndef DB_LMDB_DBI_H
 #define DB_LMDB_DBI_H
 
 #include <lmdb.h>
-
-#include "db_lmdb.h" /* dbi_t / dbi_type_t */
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -19,71 +20,43 @@ extern "C"
 #endif
 
 /**
- * @brief Sentinel to request automatic default put flags selection.
+ * @brief Sentinel value used to request automatic default put flags.
  *
- * - Non-DUPSORT: MDB_NOOVERWRITE (unique keys).
- * - DUPSORT:     MDB_NODUPDATA   (unique duplicates).
+ * When a caller supplies this value for the @p put_flags_default parameter
+ * of `db_lmdb_dbi_init`, the implementation will select a safe default based
+ * on the resolved DB flags:
+ *  - Non-DUPSORT: MDB_NOOVERWRITE (enforce unique keys)
+ *  - DUPSORT:     MDB_NODUPDATA   (enforce unique duplicates)
  */
 #define DBI_PUT_FLAGS_AUTO 0xFFFFFFFFu
-
 /**
- * @brief Types of LMDB named databases.
- */
-typedef enum
-{
-    DBI_TYPE_DEFAULT  = 0,     /* no special flags */
-    DBI_TYPE_DUPSORT  = 1,     /* sorted duplicate keys */
-    DBI_TYPE_DUPFIXED = 1 << 1 /* fixed-size duplicate keys */
-} dbi_type_t;
-
-/**
- * @brief Cached descriptor for one LMDB named database.
+ * @brief Cached, persistent descriptor for an opened named DBI.
+ *
+ * The runtime stores an array of these descriptors for quick access to the
+ * MDB_dbi handle and precomputed flags used by higher-level operations.
  */
 typedef struct
 {
     MDB_dbi     dbi;               /**< LMDB handle. */
     const char* name;              /**< Logical name (non-owning). */
+    dbi_type_t  type;              /**< Requested logical type (flags). */
     unsigned    open_flags;        /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
     unsigned    db_flags;          /**< Cached mdb_dbi_flags(txn, dbi). */
     unsigned    put_flags_default; /**< Default flags to OR into mdb_put calls. */
-    int         is_dupsort;        /**< Convenience: db_flags & MDB_DUPSORT. */
-    int         is_dupfixed;       /**< Convenience: db_flags & MDB_DUPFIXED. */
+    int         is_dupsort;        /**< Non-zero if DB uses MDB_DUPSORT. */
+    int         is_dupfixed;       /**< Non-zero if DB uses MDB_DUPFIXED. */
 } dbi_desc_t;
 
 /**
- * @brief Compute LMDB open flags from dbi_type_t, always including MDB_CREATE.
- */
-static inline unsigned dbi_desc_open_flags(dbi_type_t type)
-{
-    unsigned flags = MDB_CREATE;
-    if(type & DBI_TYPE_DUPSORT) flags |= MDB_DUPSORT;
-    if(type & DBI_TYPE_DUPFIXED) flags |= MDB_DUPFIXED;
-    return flags;
-}
-
-/**
- * @brief Pick safe default put flags based on cached DB flags.
+ * @brief Initialize all declared DBIs for the current DB.
  *
- * Non-DUPSORT -> MDB_NOOVERWRITE to enforce unique keys.
- * DUPSORT     -> MDB_NODUPDATA to enforce unique duplicates.
- */
-static inline unsigned dbi_desc_default_put_flags(unsigned db_flags)
-{
-    return (db_flags & MDB_DUPSORT) ? MDB_NODUPDATA : MDB_NOOVERWRITE;
-}
-
-/**
- * @brief Open a named DBI and populate a descriptor with cached flags.
+ * Opens each named DBI, caches flags, and records descriptors in the global DB.
  *
- * @param txn                 Active transaction (write).
- * @param name                Database name (must outlive descriptor).
- * @param open_flags          Flags for mdb_dbi_open (should include MDB_CREATE).
- * @param put_flags_default   Default put flags; use DBI_PUT_FLAGS_AUTO to derive.
- * @param out                 Destination descriptor.
+ * @param dbis    Array of declarations (names must outlive DB lifetime).
+ * @param n_dbis  Number of declarations.
  * @return 0 on success, negative errno on failure.
  */
-int dbi_desc_init(MDB_txn* txn, const char* name, unsigned open_flags, unsigned put_flags_default,
-                  dbi_desc_t* out);
+int db_lmdb_dbi_init(const dbi_decl_t* dbis, const size_t n_dbis);
 
 #ifdef __cplusplus
 }

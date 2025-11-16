@@ -1,18 +1,20 @@
 /**
  * @file db_lmdb_core.c
- * @brief Map LMDB return codes to retry/resize/fatal decisions.
  */
 
 #include "db_lmdb_core.h"
-#include "db_lmdb_internal.h"
-
-#define LOG_TAG "lmdb_core"
+#include "db_lmdb_internal.h" /* interface, config, emlog */
 
 /************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
-/* None */
+
+#define LOG_TAG                   "db_lmdb_core"
+
+#define DB_LMDB_RETRY_TRANSACTION 2
+#define DB_LMDB_RETRY_OPERATION   3
+#define DB_LMDB_RETRY_GET_FLAGS   3
 
 /************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -32,15 +34,12 @@
  */
 
 /**
- * @brief Map LMDB return code to errno-style code.
- * @param mdb_rc LMDB return code.
- * @return Mapped errno-style code.
- */
-static int _mapped(int mdb_rc);
-
-/**
  * @brief Core safety decision function.
  *
+ * This function maps LMDB return codes into actionable decisions
+ * according to the safety policy. If a transaction is provided, it
+ * aborts the transaction on RETRY/FAIL if provided.
+ * 
  * @param mdb_rc       LMDB return code.
  * @param is_write_txn Non-zero if the operation was in a write transaction.
  * @param retry_budget Optional retry counter (decremented on retry). May be NULL.
@@ -48,15 +47,27 @@ static int _mapped(int mdb_rc);
  * @param txn          Optional txn to abort on RETRY/FAIL. May be NULL.
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
-int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_mapped_err,
+int _safety_check(int mdb_rc, int is_write_txn, uint8_t* retry_budget, int* out_mapped_err,
                   MDB_txn* txn);
+
+/**
+ * @brief Helper to get DBI flags with safety retry baked in.
+ * 
+ * @param txn       LMDB transaction.
+ * @param dbi       LMDB DBI handle.
+ * @param out_flags Filled with DBI flags on success.
+ * @param out_err   Optional mapped errno on FAIL.
+ * @return 0 on success, DB_LMDB_SAFE_FAIL on failure.
+ */
+static int _get_dbi_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags, int* out_err);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
-int db_lmdb_core_create_env_safe(struct DB* DataBase, const char* path, unsigned int max_dbis, size_t db_map_size)
+int db_lmdb_core_create_env_safe(struct DB* DataBase, const char* path, unsigned int max_dbis,
+                                 size_t db_map_size)
 {
     /* Check input */
     if(!path || !DataBase)
@@ -100,16 +111,21 @@ int db_lmdb_core_create_env_safe(struct DB* DataBase, const char* path, unsigned
     return DB_LMDB_SAFE_OK;
 }
 
-int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size_t* retry_budget,
-                           int* out_err)
+int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, int* out_err)
 {
     /* Check input */
-    if(!env || !out_txn) return DB_LMDB_SAFE_FAIL;
+    if(!env || !out_txn)
+    {
+        EML_ERROR(LOG_TAG, "txn_begin_safe: invalid input (env=%p out_txn=%p)", (void*)env,
+                  (void*)out_txn);
+        return DB_LMDB_SAFE_FAIL;
+    }
+    uint8_t retry_budget = DB_LMDB_RETRY_TRANSACTION;
 
 retry:
 {
     int res = mdb_txn_begin(env, NULL, flags, out_txn);
-    int act = _safety_check(res, 0, retry_budget, out_err, out_txn);
+    int act = _safety_check(res, 0, &retry_budget, out_err, out_txn);
     if(act == DB_LMDB_SAFE_OK) return DB_LMDB_SAFE_OK;
     if(act == DB_LMDB_SAFE_RETRY) goto retry;
     return DB_LMDB_SAFE_FAIL;
@@ -119,32 +135,18 @@ retry:
 int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err)
 {
     /* Check input */
-    if(!txn) return DB_LMDB_SAFE_FAIL;
+    if(!txn)
+    {
+        EML_ERROR(LOG_TAG, "txn_commit_safe: invalid input (txn=NULL)");
+        return DB_LMDB_SAFE_FAIL;
+    }
+    uint8_t retry_budget = DB_LMDB_RETRY_TRANSACTION;
 
 retry:
 {
     int res = mdb_txn_commit(txn);
-    int act = _safety_check(res, 1, retry_budget, out_err, NULL);
+    int act = _safety_check(res, 1, &retry_budget, out_err, NULL);
     if(act == DB_LMDB_SAFE_OK) return DB_LMDB_SAFE_OK;
-    if(act == DB_LMDB_SAFE_RETRY) goto retry;
-    return DB_LMDB_SAFE_FAIL;
-}
-}
-
-int db_lmdb_get_db_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags, size_t* retry_budget,
-                         int* out_err)
-{
-    if(!txn || !out_flags)
-    {
-        EML_ERROR(LOG_TAG, "db_lmdb_flags: invalid input (txn=%p out_flags=%p)", (void*)txn,
-                  (void*)out_flags);
-    }
-
-retry:
-{
-    int res = mdb_dbi_flags(txn, dbi, out_flags);
-    int act = _safety_check(res, 0, retry_budget, out_err, NULL);
-    if(act == DB_LMDB_SAFE_OK) return 0;
     if(act == DB_LMDB_SAFE_RETRY) goto retry;
     return DB_LMDB_SAFE_FAIL;
 }
@@ -154,17 +156,11 @@ retry:
  * PRIVATE FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
-static int _mapped(int mdb_rc)
-{
-    return db_map_mdb_err(mdb_rc);
-}
-
-int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_mapped_err,
+int _safety_check(int mdb_rc, int is_write_txn, uint8_t* retry_budget, int* out_mapped_err,
                   MDB_txn* txn)
 {
     /* Map error if requested */
-    if(out_mapped_err) *out_mapped_err = _mapped(mdb_rc);
+    if(out_mapped_err) *out_mapped_err = db_map_mdb_err(mdb_rc);
 
     /* Fast path */
     if(mdb_rc == MDB_SUCCESS) return DB_LMDB_SAFE_OK;
@@ -174,7 +170,7 @@ int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_m
     {
         /* If not transaction in input, the operation does not have to retry,
         and if not MDB_SUCCESS, then return fail, nothing to retry */
-        return DB_LMDB_SAFE_FAIL;
+        goto fatal;
     }
 
     /* Expected benign cases that callers may treat as fail */
@@ -198,15 +194,15 @@ int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_m
     }
 
     /* Check retry budget */
-    if(!retry_budget || *retry_budget == 0)
+    if(*retry_budget == 0)
     {
         EML_ERROR(LOG_TAG, "_decide: retry budget exhausted");
         return DB_LMDB_SAFE_FAIL;
     }
     else
     {
-        EML_WARN(LOG_TAG, "_decide: retryable mdb_rc=%d, retry_budget=%zu", mdb_rc, *retry_budget);
-        (*retry_budget)--;
+        EML_WARN(LOG_TAG, "_decide: retryable mdb_rc=%d, retry_budget=%zu", mdb_rc, retry_budget);
+        *retry_budget--;
     }
     if(txn) mdb_txn_abort(txn);
     return DB_LMDB_SAFE_RETRY;
@@ -215,4 +211,23 @@ fatal:
     (void)is_write_txn; /* reserved for future use */
     if(txn) mdb_txn_abort(txn);
     return DB_LMDB_SAFE_FAIL;
+}
+
+static int _get_dbi_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags, int* out_err)
+{
+    if(!txn || !out_flags)
+    {
+        EML_ERROR(LOG_TAG, "db_lmdb_flags: invalid input (txn=%p out_flags=%p)", (void*)txn,
+                  (void*)out_flags);
+    }
+    uint8_t retry_budget = DB_LMDB_RETRY_GET_FLAGS;
+
+retry:
+{
+    int res = mdb_dbi_flags(txn, dbi, out_flags);
+    int act = _safety_check(res, 0, &retry_budget, out_err, NULL);
+    if(act == DB_LMDB_SAFE_OK) return 0;
+    if(act == DB_LMDB_SAFE_RETRY) goto retry;
+    return DB_LMDB_SAFE_FAIL;
+}
 }
