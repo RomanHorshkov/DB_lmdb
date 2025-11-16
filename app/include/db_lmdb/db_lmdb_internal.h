@@ -44,11 +44,11 @@ extern "C"
  */
 struct DB
 {
-    MDB_env* env;                /* LMDB environment */
-    dbi_desc_t* dbis;            /* array of DBI descriptors */
-    uint8_t  n_dbis;             /* number of DBIs in array */
-    size_t   map_size_bytes;     /* current map size */
-    size_t   map_size_bytes_max; /* maximum map size */
+    MDB_env*     env;                /* LMDB environment */
+    dbi_desc_t*  dbis;               /* array of DBI descriptors */
+    unsigned int n_dbis;             /* number of DBIs in array */
+    size_t       map_size_bytes;     /* current map size */
+    size_t       map_size_bytes_max; /* maximum map size */
 
     // /* USER DBIs */
     // MDB_dbi db_user_id2meta; /* ID -> META */

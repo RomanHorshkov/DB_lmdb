@@ -36,8 +36,8 @@ int dbi_desc_init(MDB_txn* txn, const char* name, unsigned open_flags, unsigned 
     out->is_dupsort        = (db_flags & MDB_DUPSORT) != 0;
     out->is_dupfixed       = (db_flags & MDB_DUPFIXED) != 0;
     out->put_flags_default = (put_flags_default == DBI_PUT_FLAGS_AUTO)
-                                 ? dbi_desc_default_put_flags(db_flags)
-                                 : put_flags_default;
+                               ? dbi_desc_default_put_flags(db_flags)
+                               : put_flags_default;
 
     return 0;
 }

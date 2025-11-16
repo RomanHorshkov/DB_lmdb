@@ -1,206 +1,153 @@
 /**
  * @file db_lmdb_core.c
+ * @brief Map LMDB return codes to retry/resize/fatal decisions.
  */
 
-#include "db_lmdb.h"
-#include "db_lmdb_config.h"
+#include "db_lmdb_core.h"
 #include "db_lmdb_internal.h"
-
-#include "emlog.h"
-
-/****************************************************************************
- * PRIVATE DEFINES
- ****************************************************************************
- */
 
 #define LOG_TAG "lmdb_core"
 
-/****************************************************************************
+/************************************************************************
+ * PRIVATE DEFINES
+ ****************************************************************************
+ */
+/* None */
+
+/************************************************************************
  * PRIVATE STUCTURED VARIABLES
  ****************************************************************************
  */
 /* None */
 
-/****************************************************************************
+/************************************************************************
  * PRIVATE VARIABLES
  ****************************************************************************
  */
+/* None */
 
-/* Global DB handle */
-struct DB* DB = NULL;
-
-/****************************************************************************
+/************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
  ****************************************************************************
  */
+
+/**
+ * @brief Map LMDB return code to errno-style code.
+ * @param mdb_rc LMDB return code.
+ * @return Mapped errno-style code.
+ */
+static int _mapped(int mdb_rc);
+
+/**
+ * @brief Core safety decision function.
+ *
+ * @param mdb_rc       LMDB return code.
+ * @param is_write_txn Non-zero if the operation was in a write transaction.
+ * @param retry_budget Optional retry counter (decremented on retry). May be NULL.
+ * @param out_mapped_err Optional mapped errno on FAIL.
+ * @param txn          Optional txn to abort on RETRY/FAIL. May be NULL.
+ * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ */
+int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_mapped_err,
+                  MDB_txn* txn);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-int db_lmdb_init(int n_dbis, const char* meta_dir)
+
+int db_lmdb_core_create_env_safe(struct DB* DataBase, const char* path, unsigned int max_dbis, size_t db_map_size)
 {
-    int        res    = -EINVAL;
-    struct DB* new_db = NULL;
-
-    if(DB)
+    /* Check input */
+    if(!path || !DataBase)
     {
-        EML_ERROR(LOG_TAG, "_lmdb_init: database already initialized");
-        return -EALREADY;
-    }
-
-    if(n_dbis <= 0 || n_dbis > DB_MAX_DBIS || !meta_dir || !(*meta_dir))
-    {
-        EML_ERROR(LOG_TAG, "_lmdb_init: invalid arguments n_dbis=%d", n_dbis);
+        EML_ERROR(LOG_TAG, "_create_env_safe: invalid input");
         return -EINVAL;
     }
 
-    /* Allocate DB */
-    new_db = calloc(1, sizeof(struct DB));
-    if(!new_db)
+    /* Create environment and pass through safety */
+    int res = mdb_env_create(&DataBase->env);
+    if(_safety_check(res, 0, NULL, NULL, NULL) != DB_LMDB_SAFE_OK)
     {
-        res = -ENOMEM;
-        goto fail_mem;
-    }
-
-    /* Allocate sub-dbis (descriptor form) */
-    new_db->dbis = calloc((size_t)n_dbis, sizeof(dbi_desc_t));
-    if(!new_db->dbis)
-    {
-        res = -ENOMEM;
-        goto fail_mem;
-    }
-
-    /* Set number of dbis */
-    new_db->n_dbis = (uint8_t)n_dbis;
-
-    /* Create LMDB environment */
-    res = mdb_env_create(&new_db->env);
-    if(res != MDB_SUCCESS)
-    {
-        EML_ERROR(LOG_TAG, "mdb_env_create failed with err %d", res);
-        res = db_map_mdb_err(res);
-        goto fail_lmdb;
+        LMDB_LOG_ERR(LOG_TAG, "_create_env_safe: mdb_env_create failed", res);
+        return res;
     }
 
     /* Set max sub-dbis */
-    res = mdb_env_set_maxdbs(new_db->env, DB_MAX_DBIS);
-    if(res != MDB_SUCCESS)
+    res = mdb_env_set_maxdbs(DataBase->env, (MDB_dbi)max_dbis);
+    if(_safety_check(res, 0, NULL, NULL, NULL) != DB_LMDB_SAFE_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "mdb_env_set_maxdbs failed", res);
-        goto fail_lmdb;
+        LMDB_LOG_ERR(LOG_TAG, "_create_env_safe: mdb_env_set_maxdbs failed", res);
+        return res;
     }
 
     /* Set initial map size */
-    res = mdb_env_set_mapsize(new_db->env, DB_MAP_SIZE_INIT);
-    if(res != MDB_SUCCESS)
+    res = mdb_env_set_mapsize(DataBase->env, db_map_size);
+    if(_safety_check(res, 0, NULL, NULL, NULL) != DB_LMDB_SAFE_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "mdb_env_set_mapsize failed", res);
-        goto fail_lmdb;
+        LMDB_LOG_ERR(LOG_TAG, "_create_env_safe: mdb_env_set_mapsize failed", res);
+        return res;
     }
 
     /* Open environment */
-    res = mdb_env_open(new_db->env, meta_dir, 0, 0770);
-    if(res != MDB_SUCCESS)
+    res = mdb_env_open(DataBase->env, path, 0, 0770);
+    if(_safety_check(res, 0, NULL, NULL, NULL) != DB_LMDB_SAFE_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "mdb_env_open failed", res);
-        goto fail_lmdb;
+        LMDB_LOG_ERR(LOG_TAG, "_create_env_safe: mdb_env_open failed", res);
+        return res;
     }
 
-    /* Set map size values */
-    new_db->map_size_bytes     = DB_MAP_SIZE_INIT;
-    new_db->map_size_bytes_max = DB_MAP_SIZE_MAX;
-
-    DB = new_db;
-
-    EML_DBG(LOG_TAG, "LMDB environment opened at %s", meta_dir);
-    EML_DBG(LOG_TAG, "LMDB map size: initial=%zu bytes, max=%zu bytes", new_db->map_size_bytes,
-            new_db->map_size_bytes_max);
-
-    return 0;
-
-fail_lmdb:
-    res = db_map_mdb_err(res);
-
-fail_mem:
-    EML_PERR(LOG_TAG, "db_lmdb_init failed with err %d", res);
-    if(new_db)
-    {
-        if(new_db->env)
-        {
-            mdb_env_close(new_db->env);
-        }
-        free(new_db->dbis);
-        free(new_db);
-    }
-    return res;
+    return DB_LMDB_SAFE_OK;
 }
 
-int db_lmdb_open_dbis(dbi_t* dbis, size_t n_dbis)
+int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size_t* retry_budget,
+                           int* out_err)
 {
-    if(!DB || !DB->env || !DB->dbis || n_dbis > DB->n_dbis) return -EINVAL;
+    /* Check input */
+    if(!env || !out_txn) return DB_LMDB_SAFE_FAIL;
 
-    /* Open a transaction to open sub-dbis */
-    MDB_txn* txn = NULL;
-
-    int ret = mdb_txn_begin(DB->env, NULL, 0, &txn);
-    if(ret != MDB_SUCCESS)
-    {
-        LMDB_LOG_ERR(LOG_TAG, "_open_dbis _txn_begin failed", ret);
-        return db_map_mdb_err(ret);
-    }
-
-    for(size_t i = 0; i < DB->n_dbis; i++)
-    {
-        unsigned open_flags = dbi_desc_open_flags(dbis[i].type);
-        ret = dbi_desc_init(txn, dbis[i].name, open_flags, DBI_PUT_FLAGS_AUTO, &DB->dbis[i]);
-        if(ret != 0)
-        {
-            LMDB_LOG_ERR(LOG_TAG, "_open_dbis dbi_desc_init failed", ret);
-            goto fail_txn;
-        }
-    }
-    ret = mdb_txn_commit(txn);
-    if(ret != MDB_SUCCESS)
-    {
-        LMDB_LOG_ERR(LOG_TAG, "_open_dbis _txn_commit failed", ret);
-        goto fail;
-    }
-
-    EML_DBG(LOG_TAG, "Successfully opened all sub dbis");
-    return 0;
-
-fail_txn:
-    mdb_txn_abort(txn);
-fail:
-    return (ret > 0) ? db_map_mdb_err(ret) : ret;
+retry:
+{
+    int res = mdb_txn_begin(env, NULL, flags, out_txn);
+    int act = _safety_check(res, 0, retry_budget, out_err, out_txn);
+    if(act == DB_LMDB_SAFE_OK) return DB_LMDB_SAFE_OK;
+    if(act == DB_LMDB_SAFE_RETRY) goto retry;
+    return DB_LMDB_SAFE_FAIL;
+}
 }
 
-int db_lmdb_metrics(uint64_t* used, uint64_t* mapsize, uint32_t* psize)
+int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err)
 {
-    if(!DB || !DB->env) return -EINVAL;
-    MDB_envinfo info;
-    MDB_stat    st;
-    int         rc;
-    rc = mdb_env_info(DB->env, &info);
-    if(rc != MDB_SUCCESS) return -EIO;
-    rc = mdb_env_stat(DB->env, &st);
-    if(rc != MDB_SUCCESS) return -EIO;
-    if(mapsize) *mapsize = (uint64_t)info.me_mapsize;
-    if(psize) *psize = (uint32_t)st.ms_psize;
-    if(used) *used = ((uint64_t)info.me_last_pgno + 1ull) * (uint64_t)st.ms_psize;
-    return 0;
+    /* Check input */
+    if(!txn) return DB_LMDB_SAFE_FAIL;
+
+retry:
+{
+    int res = mdb_txn_commit(txn);
+    int act = _safety_check(res, 1, retry_budget, out_err, NULL);
+    if(act == DB_LMDB_SAFE_OK) return DB_LMDB_SAFE_OK;
+    if(act == DB_LMDB_SAFE_RETRY) goto retry;
+    return DB_LMDB_SAFE_FAIL;
+}
 }
 
-void db_lmdb_close(void)
+int db_lmdb_get_db_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags, size_t* retry_budget,
+                         int* out_err)
 {
-    if(!DB) return;
+    if(!txn || !out_flags)
+    {
+        EML_ERROR(LOG_TAG, "db_lmdb_flags: invalid input (txn=%p out_flags=%p)", (void*)txn,
+                  (void*)out_flags);
+    }
 
-    if(DB->env) mdb_env_close(DB->env);
-
-    if(DB->dbis) free(DB->dbis);
-
-    free(DB);
+retry:
+{
+    int res = mdb_dbi_flags(txn, dbi, out_flags);
+    int act = _safety_check(res, 0, retry_budget, out_err, NULL);
+    if(act == DB_LMDB_SAFE_OK) return 0;
+    if(act == DB_LMDB_SAFE_RETRY) goto retry;
+    return DB_LMDB_SAFE_FAIL;
+}
 }
 
 /****************************************************************************
@@ -208,51 +155,64 @@ void db_lmdb_close(void)
  ****************************************************************************
  */
 
-int db_map_mdb_err(int rc)
+static int _mapped(int mdb_rc)
 {
-    if(rc == MDB_SUCCESS) return 0;
+    return db_map_mdb_err(mdb_rc);
+}
 
-    switch(rc)
+int _safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_mapped_err,
+                  MDB_txn* txn)
+{
+    /* Map error if requested */
+    if(out_mapped_err) *out_mapped_err = _mapped(mdb_rc);
+
+    /* Fast path */
+    if(mdb_rc == MDB_SUCCESS) return DB_LMDB_SAFE_OK;
+
+    /* Should be able to accept with null txn to just check the rc */
+    if(!txn)
     {
-        case MDB_NOTFOUND:
-            return -ENOENT;    /* absent key/EOF */
-        case MDB_KEYEXIST:
-            return -EEXIST;    /* unique constraint */
-        case MDB_MAP_FULL:
-            return -ENOSPC;    /* env mapsize reached */
-        case MDB_DBS_FULL:
-            return -ENOSPC;    /* max named DBs */
-        case MDB_READERS_FULL:
-            return -EAGAIN;    /* too many readers */
-        case MDB_TXN_FULL:
-            return -EOVERFLOW; /* too many dirty pages */
-        case MDB_CURSOR_FULL:
-            return -EOVERFLOW; /* internal stack too deep */
-        case MDB_PAGE_FULL:
-            return -ENOSPC;    /* internal page space */
-        case MDB_MAP_RESIZED:
-            return -EAGAIN;    /* retry after resize */
-        case MDB_INCOMPATIBLE:
-            return -EPROTO;    /* flags/type mismatch */
-        case MDB_VERSION_MISMATCH:
-            return -EINVAL;    /* library/env mismatch */
-        case MDB_INVALID:
-            return -EINVAL;    /* not an LMDB file */
-        case MDB_PAGE_NOTFOUND:
-            return -EIO;       /* likely corruption */
-        case MDB_CORRUPTED:
-            return -EIO;       /* detected corruption */
-        case MDB_PANIC:
-            return -EIO;       /* fatal env error */
-        case MDB_BAD_RSLOT:
-            return -EBUSY;     /* reader slot misuse */
-        case MDB_BAD_TXN:
-            return -EINVAL;    /* invalid/child txn */
-        case MDB_BAD_VALSIZE:
-            return -EINVAL;    /* key/data size wrong */
-        case MDB_BAD_DBI:
-            return -ESTALE;    /* DBI changed/dropped */
-        default:
-            return -rc;        /* unknown error, let pass the code */
+        /* If not transaction in input, the operation does not have to retry,
+        and if not MDB_SUCCESS, then return fail, nothing to retry */
+        return DB_LMDB_SAFE_FAIL;
     }
+
+    /* Expected benign cases that callers may treat as fail */
+    if(mdb_rc == MDB_NOTFOUND || mdb_rc == MDB_KEYEXIST) return DB_LMDB_SAFE_FAIL;
+
+    /* Retryable classes */
+    switch(mdb_rc)
+    {
+        case MDB_MAP_RESIZED:
+        case MDB_PAGE_FULL:
+        case MDB_TXN_FULL:
+        case MDB_CURSOR_FULL:
+        case MDB_BAD_RSLOT:
+        case MDB_READERS_FULL:
+            break;                                  /* go to retry */
+        case MDB_MAP_FULL:
+            if(db_env_mapsize_expand() == 0) break; /* then retry */
+            /* fallthrough to fail if resize impossible */
+        default:
+            goto fatal;
+    }
+
+    /* Check retry budget */
+    if(!retry_budget || *retry_budget == 0)
+    {
+        EML_ERROR(LOG_TAG, "_decide: retry budget exhausted");
+        return DB_LMDB_SAFE_FAIL;
+    }
+    else
+    {
+        EML_WARN(LOG_TAG, "_decide: retryable mdb_rc=%d, retry_budget=%zu", mdb_rc, *retry_budget);
+        (*retry_budget)--;
+    }
+    if(txn) mdb_txn_abort(txn);
+    return DB_LMDB_SAFE_RETRY;
+
+fatal:
+    (void)is_write_txn; /* reserved for future use */
+    if(txn) mdb_txn_abort(txn);
+    return DB_LMDB_SAFE_FAIL;
 }

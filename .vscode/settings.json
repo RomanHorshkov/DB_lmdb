@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "cstdlib": "c",
+        "db_lmdb_internal.h": "c",
+        "db_lmdb_safety.h": "c",
+        "db_lmdb_core.h": "c"
+    }
+}

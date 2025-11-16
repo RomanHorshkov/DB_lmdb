@@ -205,13 +205,13 @@ retry:
     if((dbif & MDB_DUPSORT) != 0)
     {
         put_flags &= ~MDB_RESERVE; /* not valid with dupsort comparison */
-        v.mv_size = vlen;
-        v.mv_data = (void*)val;
-        res       = mdb_put(txn, dbi, &k, &v, put_flags);
+        v.mv_size  = vlen;
+        v.mv_data  = (void*)val;
+        res        = mdb_put(txn, dbi, &k, &v, put_flags);
         if(res != MDB_SUCCESS)
         {
             LMDB_LOG_ERR(LOG_TAG, "put_one:mdb_put dupsort", res);
-            switch(db_lmdb_safety_decide(res, 1, &retry_budget, &mapped_err, txn))
+            switch(db_lmdb_safety_check(res, 1, &retry_budget, &mapped_err, txn))
             {
                 case DB_LMDB_SAFE_RETRY:
                     goto retry;
@@ -236,7 +236,7 @@ retry:
         if(res != MDB_SUCCESS)
         {
             LMDB_LOG_ERR(LOG_TAG, "put_one:mdb_put RESERVE", res);
-            switch(db_lmdb_safety_decide(res, 1, &retry_budget, &mapped_err, txn))
+            switch(db_lmdb_safety_check(res, 1, &retry_budget, &mapped_err, txn))
             {
                 case DB_LMDB_SAFE_RETRY:
                     goto retry;

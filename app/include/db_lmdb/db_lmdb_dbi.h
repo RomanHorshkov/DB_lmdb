@@ -27,17 +27,27 @@ extern "C"
 #define DBI_PUT_FLAGS_AUTO 0xFFFFFFFFu
 
 /**
+ * @brief Types of LMDB named databases.
+ */
+typedef enum
+{
+    DBI_TYPE_DEFAULT  = 0,     /* no special flags */
+    DBI_TYPE_DUPSORT  = 1,     /* sorted duplicate keys */
+    DBI_TYPE_DUPFIXED = 1 << 1 /* fixed-size duplicate keys */
+} dbi_type_t;
+
+/**
  * @brief Cached descriptor for one LMDB named database.
  */
 typedef struct
 {
-    MDB_dbi   dbi;               /**< LMDB handle. */
-    const char* name;            /**< Logical name (non-owning). */
-    unsigned  open_flags;        /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
-    unsigned  db_flags;          /**< Cached mdb_dbi_flags(txn, dbi). */
-    unsigned  put_flags_default; /**< Default flags to OR into mdb_put calls. */
-    int       is_dupsort;        /**< Convenience: db_flags & MDB_DUPSORT. */
-    int       is_dupfixed;       /**< Convenience: db_flags & MDB_DUPFIXED. */
+    MDB_dbi     dbi;               /**< LMDB handle. */
+    const char* name;              /**< Logical name (non-owning). */
+    unsigned    open_flags;        /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
+    unsigned    db_flags;          /**< Cached mdb_dbi_flags(txn, dbi). */
+    unsigned    put_flags_default; /**< Default flags to OR into mdb_put calls. */
+    int         is_dupsort;        /**< Convenience: db_flags & MDB_DUPSORT. */
+    int         is_dupfixed;       /**< Convenience: db_flags & MDB_DUPFIXED. */
 } dbi_desc_t;
 
 /**
@@ -72,8 +82,8 @@ static inline unsigned dbi_desc_default_put_flags(unsigned db_flags)
  * @param out                 Destination descriptor.
  * @return 0 on success, negative errno on failure.
  */
-int dbi_desc_init(MDB_txn* txn, const char* name, unsigned open_flags,
-                  unsigned put_flags_default, dbi_desc_t* out);
+int dbi_desc_init(MDB_txn* txn, const char* name, unsigned open_flags, unsigned put_flags_default,
+                  dbi_desc_t* out);
 
 #ifdef __cplusplus
 }
