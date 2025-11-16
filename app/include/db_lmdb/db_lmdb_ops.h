@@ -27,7 +27,9 @@
 #ifndef DB_OPERATIONS_H
 #define DB_OPERATIONS_H
 
-#include "db_internal.h" /* lmdb.h, stdio, stdlib, string, time */
+#include <lmdb.h>
+
+#include "db_lmdb_dbi.h"
 #include "void_store.h"
 
 #ifdef __cplusplus
@@ -55,7 +57,7 @@ typedef enum
     DB_OPERATION_MAX
 } DB_operation_type_t;
 
-struct DB_operation
+typedef struct
 {
     DB_operation_type_t type;      /**< Operation kind. */
     MDB_dbi             dbi;       /**< Target DBI handle. */
@@ -63,14 +65,9 @@ struct DB_operation
     void_store_t*       val_store; /**< Concatenated value bytes/patch. */
     unsigned            flags;     /**< LMDB flags (e.g., MDB_NOOVERWRITE/MDB_APPEND). */
 
-    struct DB_operation* prev;     /**< Previous op in chain (wired by ops_exec). */
-    struct DB_operation* next;     /**< Next op in chain (wired by ops_exec). */
-
     void*  dst;                    /**< Result buffer for GET (owned by op). */
     size_t dst_len;                /**< Result length for GET. */
-};
-
-typedef struct DB_operation DB_operation_t;
+} DB_operation_t;
 
 /**
  * @brief Allocate a zero-initialized array of operations.
@@ -94,8 +91,23 @@ DB_operation_t* ops_create(size_t n_ops);
  * 
  * @return 0 on success; negative errno on failure.
  */
-int ops_put_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size_t vlen,
+int ops_put_one(unsigned int dbi, const void* key, size_t klen, const void* val, size_t vlen,
                 unsigned flags);
+
+/**
+ * @brief Single PUT using a cached DBI descriptor (no dbi_flags lookups).
+ *
+ * @param[in]  desc  Cached descriptor with db_flags/put defaults.
+ * @param[in]  key   Pointer to key bytes (non-NULL).
+ * @param[in]  klen  Key length in bytes (>0).
+ * @param[in]  val   Pointer to value bytes (non-NULL).
+ * @param[in]  vlen  Value length in bytes (>0).
+ * @param[in]  flags Extra flags to OR with desc->put_flags_default.
+ *
+ * @return 0 on success; negative errno on failure.
+ */
+int ops_put_one_desc(const dbi_desc_t* desc, const void* key, size_t klen, const void* val,
+                     size_t vlen, unsigned flags);
 
 /**
  * @brief Prepare a PUT with a fixed key and a value composed later.
@@ -112,7 +124,7 @@ int ops_put_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size
  * @param[in]  flags         LMDB put flags (e.g., MDB_NOOVERWRITE).
  * @return 0 on success, negative errno on failure.
  */
-int ops_put_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t key_seg_size,
+int ops_put_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs, unsigned flags);
 /**
  * @brief Append one value segment to the prepared PUT.
@@ -145,7 +157,7 @@ int ops_put_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_
  *
  * @note On success, @ref ops_exec allocates @c op->dst for the value.
  */
-int ops_get_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t seg_size);
+int ops_get_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t seg_size);
 
 /**
  * @brief Single-shot GET for a key.
@@ -171,7 +183,7 @@ int ops_get_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t
  * @note Uses a short, read-only transaction and never modifies the DB.
  * @note On success with copy, *out_len is set to the exact value size.
  */
-int ops_get_one(MDB_dbi dbi, const void* key, size_t klen, void* out, size_t* out_len);
+int ops_get_one(unsigned int dbi, const void* key, size_t klen, void* out, size_t* out_len);
 
 /** @} */
 
@@ -195,7 +207,7 @@ int ops_get_one(MDB_dbi dbi, const void* key, size_t klen, void* out, size_t* ou
  * @param[in]  nsegs         Number of patch segments.
  * @return 0 on success, negative errno on failure.
  */
-int ops_rep_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t key_seg_size,
+int ops_rep_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs);
 /**
  * @brief Append one patch segment for REP.
@@ -237,7 +249,7 @@ int ops_lst_prepare(void);
  * @param[in]  nsegs         0 or 1 value segment for dup-exact delete.
  * @return 0 on success, negative errno on failure.
  */
-int ops_del_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t key_seg_size,
+int ops_del_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs);
 
 /**
@@ -267,7 +279,7 @@ int ops_del_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_
  * @retval -ENOENT  Key (or key,value) not found.
  * @retval <0       Negative errno mapped from LMDB or internal checks.
  */
-int ops_del_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size_t vlen);
+int ops_del_one(unsigned int dbi, const void* key, size_t klen, const void* val, size_t vlen);
 /** @} */
 
 /**

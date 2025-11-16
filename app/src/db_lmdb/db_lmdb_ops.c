@@ -7,23 +7,17 @@
  * (c) 2025
  */
 
-#include "db_lmdb_ops.h" /* db_internal.h -> lmdb.h, stdio, stdlib, string, time */
-
+#include "db_lmdb_ops.h"      /* db_internal.h -> lmdb.h, stdio, stdlib, string, time */
+#include "db_lmdb_internal.h" /* lmdb.h, stdio, stdlib, string, time */
+#include "db_lmdb_safety.h"
 #include "void_store.h"
-
-#include "emlog.h" /* EML_ERR etc */
 
 /****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
 
-/* Log LMDB ret with a stable format */
-#define LMDB_LOG_ERR(where, ret) \
-    EML_ERROR("db_ops", "%s: ret=%d (%s)", where, (ret), mdb_strerror(ret))
-
-#define LMDB_EML_WARN(where, ret) \
-    EML_WARN("db_ops", "%s: ret=%d (%s)", where, (ret), mdb_strerror(ret))
+#define LOG_TAG "lmdb_ops"
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -79,14 +73,6 @@ static int _prepare_key(void_store_t** st, void* key_seg, size_t seg_size);
  * @param[in]  flags LMDB flags for PUT/DEL (e.g., MDB_NOOVERWRITE).
  */
 static void _prepare_op(DB_operation_t* op, DB_operation_type_t type, MDB_dbi dbi, unsigned flags);
-
-/**
- * @brief Wire a contiguous array of operations into a doubly-linked chain.
- *
- * @param[in,out] ops   Array base.
- * @param[in]     n_ops Element count.
- */
-static void _ops_link(DB_operation_t* ops, size_t n_ops);
 
 /**
  * @brief Execute a single operation within an existing transaction.
@@ -168,107 +154,129 @@ DB_operation_t* ops_create(size_t n_ops)
     return (DB_operation_t*)calloc(n_ops, sizeof(DB_operation_t));
 }
 
-int ops_put_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size_t vlen,
-                unsigned flags) /* e.g. MDB_NOOVERWRITE | MDB_NODUPDATA */
+static int _ops_put_one_impl(MDB_dbi dbi, const void* key, size_t klen, const void* val,
+                             size_t vlen, unsigned user_flags, const unsigned* cached_db_flags)
 {
     if(dbi == 0 || !key || !val || klen == 0 || vlen == 0) return -EINVAL;
 
-    MDB_txn* txn = NULL;
+    MDB_txn* txn          = NULL;
+    int      res          = 0;
+    int      mapped_err   = 0;
+    size_t   retry_budget = 3; /* initial + two retry */
+    unsigned dbif         = cached_db_flags ? *cached_db_flags : 0;
 
 retry:
-{
-    int ret = mdb_txn_begin(DB->env, NULL, 0, &txn);
-    if(ret != MDB_SUCCESS)
+
+    /* Begin transaction */
+    switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &retry_budget, &mapped_err))
     {
-        LMDB_LOG_ERR("put_one:mdb_txn_begin", ret);
-        return db_map_mdb_err(ret);
+        case DB_LMDB_SAFE_OK:
+            break;
+        case DB_LMDB_SAFE_RETRY:
+            goto retry;
+        default:
+            return mapped_err;
     }
 
-    /* ---------------------------------------------------------------------
-     * Critical: detect DUPSORT. If set, LMDB needs to compare the VALUE,
-     * so we MUST provide real bytes (v.mv_data != NULL). MDB_RESERVE would
-     * hand LMDB a NULL pointer during placement → memcmp(NULL, ...) crash.
-     * --------------------------------------------------------------------- */
-    unsigned dbif = 0;
-    ret           = mdb_dbi_flags(txn, dbi, &dbif);
-    if(ret != MDB_SUCCESS)
+    /* Get DBI flags when not provided by descriptor */
+    if(!cached_db_flags)
     {
-        LMDB_LOG_ERR("put_one:mdb_dbi_flags", ret);
-        mdb_txn_abort(txn);
-        return db_map_mdb_err(ret);
+        switch(db_lmdb_get_db_flags(txn, dbi, &dbif, &retry_budget, &mapped_err))
+        {
+            case DB_LMDB_SAFE_OK:
+                break;
+            case DB_LMDB_SAFE_RETRY:
+                goto retry;
+            default:
+                mdb_txn_abort(txn);
+                return mapped_err;
+        }
     }
-    const int is_dups = (dbif & MDB_DUPSORT) != 0;
 
+    /* Prepare key/value */
     MDB_val k = {0};
     k.mv_size = klen;
     k.mv_data = (void*)key;
     MDB_val v = {0};
 
-    unsigned put_flags = flags;
+    unsigned put_flags = user_flags;
 
-    if(is_dups)
+    /* ---- DUPSORT path: pass actual value bytes, NO MDB_RESERVE ---- */
+    if((dbif & MDB_DUPSORT) != 0)
     {
-        /* ---- DUPSORT path: pass actual value bytes, NO MDB_RESERVE ---- */
+        put_flags &= ~MDB_RESERVE; /* not valid with dupsort comparison */
         v.mv_size = vlen;
         v.mv_data = (void*)val;
-        ret       = mdb_put(txn, dbi, &k, &v, put_flags /* no RESERVE */);
-        if(ret != MDB_SUCCESS)
+        res       = mdb_put(txn, dbi, &k, &v, put_flags);
+        if(res != MDB_SUCCESS)
         {
-            LMDB_LOG_ERR("put_one:mdb_put dupsort", ret);
-            mdb_txn_abort(txn);
-            return db_map_mdb_err(ret);
+            LMDB_LOG_ERR(LOG_TAG, "put_one:mdb_put dupsort", res);
+            switch(db_lmdb_safety_decide(res, 1, &retry_budget, &mapped_err, txn))
+            {
+                case DB_LMDB_SAFE_RETRY:
+                    goto retry;
+                case DB_LMDB_SAFE_OK: /* should not happen */
+                    EML_ERROR(LOG_TAG, "put_one: unexpected SAFE_OK on dupsort put");
+                    break;
+                default:
+                    return mapped_err;
+            }
         }
     }
+
+    /* ---- Non-DUPSORT path: keep zero-copy reserve + memcpy ---- */
     else
     {
-        /* ---- Non-DUPSORT path: keep zero-copy reserve + memcpy ---- */
         v.mv_size  = vlen;
         v.mv_data  = NULL;
+        /* Reserve space to write directly later  */
         put_flags |= MDB_RESERVE;
 
-        ret = mdb_put(txn, dbi, &k, &v, put_flags);
-        if(ret == MDB_MAP_FULL)
+        res = mdb_put(txn, dbi, &k, &v, put_flags);
+        if(res != MDB_SUCCESS)
         {
-            mdb_txn_abort(txn);
-            int xr = db_env_mapsize_expand();
-            if(xr != 0)
+            LMDB_LOG_ERR(LOG_TAG, "put_one:mdb_put RESERVE", res);
+            switch(db_lmdb_safety_decide(res, 1, &retry_budget, &mapped_err, txn))
             {
-                EML_ERROR("db_ops", "put_one: mapsize_expand failed %d", xr);
-                return xr;
+                case DB_LMDB_SAFE_RETRY:
+                    goto retry;
+                case DB_LMDB_SAFE_OK: /* should not happen */
+                    EML_ERROR(LOG_TAG, "put_one: unexpected SAFE_OK on RESERVE put");
+                    break;
+                default:
+                    return mapped_err;
             }
-            goto retry;
-        }
-        if(ret != MDB_SUCCESS)
-        {
-            LMDB_LOG_ERR("put_one:mdb_put RESERVE", ret);
-            mdb_txn_abort(txn);
-            return db_map_mdb_err(ret);
         }
 
         /* Fill reserved page now that LMDB has placed the record */
         memcpy(v.mv_data, val, vlen);
     }
 
-    ret = mdb_txn_commit(txn);
-    if(ret == MDB_MAP_FULL)
+    switch(db_lmdb_txn_commit_safe(txn, &retry_budget, &mapped_err))
     {
-        EML_WARN("db_ops", "put_one: MAP_FULL at commit, expanding & retry");
-        int xr = db_env_mapsize_expand();
-        if(xr != 0)
-        {
-            EML_ERROR("db_ops", "put_one: mapsize_expand failed %d", xr);
-            return xr;
-        }
-        goto retry; /* failed commit already aborted txn */
+        case DB_LMDB_SAFE_OK:
+            break;
+        case DB_LMDB_SAFE_RETRY:
+            goto retry;
+        default:
+            return mapped_err;
     }
-    if(ret != MDB_SUCCESS)
-    {
-        LMDB_LOG_ERR("put_one:mdb_txn_commit", ret);
-        /* failed commit already aborted txn */
-        return db_map_mdb_err(ret);
-    }
-}
+
     return 0;
+}
+
+int ops_put_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size_t vlen,
+                unsigned flags)
+{
+    return _ops_put_one_impl(dbi, key, klen, val, vlen, flags, NULL);
+}
+
+int ops_put_one_desc(const dbi_desc_t* desc, const void* key, size_t klen, const void* val,
+                     size_t vlen, unsigned flags)
+{
+    if(!desc) return -EINVAL;
+    unsigned effective_flags = desc->put_flags_default | flags;
+    return _ops_put_one_impl(desc->dbi, key, klen, val, vlen, effective_flags, &desc->db_flags);
 }
 
 int ops_put_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t key_seg_size,
@@ -282,7 +290,7 @@ int ops_put_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t
     /* Initialize key_store */
     if(_prepare_key(&op->key_store, key_seg, key_seg_size) != 0)
     {
-        fprintf(stderr, "void_store_init / add failed\n");
+        EML_ERROR(LOG_TAG, "ops_put_prepare: prepare_key failed (klen=%zu)", key_seg_size);
         return -ENOMEM;
     }
 
@@ -301,28 +309,28 @@ int ops_get_one(MDB_dbi dbi, const void* key, size_t klen, void* out, size_t* ou
 {
     if(dbi == 0 || !key || klen == 0) return -EINVAL;
 
-    int      ret = -1;
+    int      res = -1;
     MDB_txn* txn = NULL;
 
 retry:
 {
-    ret = mdb_txn_begin(DB->env, NULL, MDB_RDONLY, &txn);
-    if(ret != MDB_SUCCESS) goto fail;
+    res = mdb_txn_begin(DB->env, NULL, MDB_RDONLY, &txn);
+    if(res != MDB_SUCCESS) goto fail;
 
     MDB_val k = {0};
     k.mv_size = klen;
     k.mv_data = (void*)key;
     MDB_val v = {0};
 
-    ret = mdb_get(txn, dbi, &k, &v);
-    if(ret == MDB_NOTFOUND) goto fail;
-    if(ret == MDB_MAP_RESIZED)
+    res = mdb_get(txn, dbi, &k, &v);
+    if(res == MDB_NOTFOUND) goto fail;
+    if(res == MDB_MAP_RESIZED)
     {
         /* environment grew under us; abort and retry once more */
         mdb_txn_abort(txn);
         goto retry;
     }
-    if(ret != MDB_SUCCESS) goto fail;
+    if(res != MDB_SUCCESS) goto fail;
 
     if(out)
     {
@@ -340,30 +348,27 @@ retry:
 }
 fail:
 {
-    LMDB_EML_WARN("get_one", ret);
+    LMDB_EML_WARN(LOG_TAG, "get_one", res);
     mdb_txn_abort(txn); /* RO txn: abort to close */
-    return db_map_mdb_err(ret);
+    return db_map_mdb_err(res);
 }
 }
 
 int ops_get_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t seg_size)
 {
-    if(!op || dbi == 0) return -EIO;
-
-    /* auto-size C strings if seg_size==0 */
-    size_t klen = seg_size;
-    if(key_seg && klen == 0)
+    if(!op || dbi == 0)
     {
-        klen = strnlen((const char*)key_seg, DB_EMAIL_MAX_LEN);
+        EML_ERROR(LOG_TAG, "ops_get_prepare: invalid input (op=%p dbi=%u)", (void*)op, dbi);
+        return -EIO;
     }
 
     /* set dbi, op_type, flags, null stores and prev/next */
     _prepare_op(op, DB_OPERATION_GET, dbi, 0);
 
     /* Initialize key_store */
-    if(_prepare_key(&op->key_store, key_seg, klen) != 0)
+    if(_prepare_key(&op->key_store, key_seg, seg_size) != 0)
     {
-        EML_ERROR("db_ops", "ops_get_prepare: prepare_key failed (klen=%zu)", klen);
+        EML_ERROR(LOG_TAG, "ops_get_prepare: prepare_key failed (klen=%zu)", seg_size);
         return -ENOMEM;
     }
     /* If no key in, will try to get the the prev result as key */
@@ -382,7 +387,7 @@ int ops_rep_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t
     /* Initialize key_store */
     if(_prepare_key(&op->key_store, key_seg, key_seg_size) != 0)
     {
-        fprintf(stderr, "void_store_init / add failed\n");
+        EML_ERROR(LOG_TAG, "ops_rep_prepare: prepare_key failed (klen=%zu)", key_seg_size);
         return -ENOMEM;
     }
 
@@ -418,7 +423,7 @@ int ops_del_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t
     /* Initialize key_store (optional; if absent we’ll use prev->dst) */
     if(_prepare_key(&op->key_store, key_seg, key_seg_size) != 0)
     {
-        fprintf(stderr, "ops_del_prepare: key store init failed\n");
+        EML_ERROR(LOG_TAG, "ops_del_prepare: prepare_key failed (klen=%zu)", key_seg_size);
         return -ENOMEM;
     }
 
@@ -444,11 +449,11 @@ int ops_del_one(MDB_dbi dbi, const void* key, size_t klen, const void* val, size
 
 retry:
 {
-    int ret = mdb_txn_begin(DB->env, NULL, 0, &txn);
-    if(ret != MDB_SUCCESS)
+    int res = mdb_txn_begin(DB->env, NULL, 0, &txn);
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("del_one:mdb_txn_begin", ret);
-        return db_map_mdb_err(ret);
+        LMDB_LOG_ERR(LOG_TAG, "del_one:mdb_txn_begin", res);
+        return db_map_mdb_err(res);
     }
 
     MDB_val  k    = {.mv_size = klen, .mv_data = (void*)key};
@@ -462,36 +467,36 @@ retry:
         vptr      = &v;
     }
 
-    ret = mdb_del(txn, dbi, &k, vptr);
-    if(ret == MDB_NOTFOUND)
+    res = mdb_del(txn, dbi, &k, vptr);
+    if(res == MDB_NOTFOUND)
     {
         mdb_txn_abort(txn);
         return -ENOENT;
     }
 
-    if(ret == MDB_MAP_RESIZED)
+    if(res == MDB_MAP_RESIZED)
     {
         mdb_txn_abort(txn);
         goto retry;
     }
 
-    if(ret != MDB_SUCCESS)
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("del_one:mdb_del", ret);
+        LMDB_LOG_ERR(LOG_TAG, "del_one:mdb_del", res);
         mdb_txn_abort(txn);
-        return db_map_mdb_err(ret);
+        return db_map_mdb_err(res);
     }
 
-    ret = mdb_txn_commit(txn);
-    if(ret == MDB_MAP_RESIZED)
+    res = mdb_txn_commit(txn);
+    if(res == MDB_MAP_RESIZED)
     {
         goto retry; /* txn already aborted by failed commit */
     }
 
-    if(ret != MDB_SUCCESS)
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("del_one:mdb_txn_commit", ret);
-        return db_map_mdb_err(ret);
+        LMDB_LOG_ERR(LOG_TAG, "del_one:mdb_txn_commit", res);
+        return db_map_mdb_err(res);
     }
 }
     return 0;
@@ -501,35 +506,32 @@ int ops_exec(DB_operation_t* ops, size_t* n_ops)
 {
     if(!ops || !n_ops || *n_ops == 0)
     {
-        EML_ERROR("db_ops", "ops_exec: invalid input (ops=%p n_ops=%p *n_ops=%zu)", (void*)ops,
+        EML_ERROR(LOG_TAG, "ops_exec: invalid input (ops=%p n_ops=%p *n_ops=%zu)", (void*)ops,
                   (void*)n_ops, n_ops ? *n_ops : 0UL);
         return -EINVAL;
     }
-
-    /* link the operations */
-    _ops_link(ops, *n_ops);
 
     /* Initialize the transaction */
     MDB_txn* txn = NULL;
 
 retry:
-    int ret = mdb_txn_begin(DB->env, NULL, 0, &txn);
-    if(ret != MDB_SUCCESS)
+    int res = mdb_txn_begin(DB->env, NULL, 0, &txn);
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("ops_exec:mdb_txn_begin", ret);
+        LMDB_LOG_ERR(LOG_TAG, "ops_exec:mdb_txn_begin", res);
         goto fail;
     }
 
     for(size_t i = 0; i < *n_ops; i++)
     {
         /* exec single operation */
-        ret = _exec_op(txn, &ops[i]);
+        res = _exec_op(txn, &ops[i]);
 
-        if(ret != MDB_SUCCESS)
+        if(res != MDB_SUCCESS)
         {
-            if(ret == MDB_MAP_FULL)
+            if(res == MDB_MAP_FULL)
             {
-                EML_WARN("db_ops",
+                EML_WARN(LOG_TAG,
                          "ops_exec: MDB_MAP_FULL during op %zu, expanding "
                          "mapsize & retry",
                          i);
@@ -537,43 +539,43 @@ retry:
                 int xr = db_env_mapsize_expand();
                 if(xr != 0)
                 {
-                    EML_ERROR("db_ops", "ops_exec: mapsize_expand failed ret=%d", xr);
-                    ret = xr;
+                    EML_ERROR(LOG_TAG, "ops_exec: mapsize_expand failed res=%d", xr);
+                    res = xr;
                     goto fail;
                 }
                 goto retry;
             }
             // exec_op may already return mapped errors; log original if it’s LMDB-ish
-            EML_ERROR("db_ops", "ops_exec: %d", ret);
+            EML_ERROR(LOG_TAG, "ops_exec: %d", res);
             goto fail;
         }
     }
 
     /* Commit the transaction */
-    ret = mdb_txn_commit(txn);
-    if(ret == MDB_MAP_FULL)
+    res = mdb_txn_commit(txn);
+    if(res == MDB_MAP_FULL)
     {
-        EML_WARN("db_ops", "ops_exec: MDB_MAP_FULL at commit, expanding & retry");
+        EML_WARN(LOG_TAG, "ops_exec: MDB_MAP_FULL at commit, expanding & retry");
         /* txn aborted by commit */
         int xr = db_env_mapsize_expand();
         if(xr != 0)
         {
-            EML_ERROR("db_ops", "ops_exec: mapsize_expand failed ret=%d", xr);
-            ret = xr;
+            EML_ERROR(LOG_TAG, "ops_exec: mapsize_expand failed res=%d", xr);
+            res = xr;
             goto fail;
         }
         goto retry;
     }
-    if(ret != MDB_SUCCESS)
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("ops_exec:mdb_txn_commit", ret);
+        LMDB_LOG_ERR(LOG_TAG, "ops_exec:mdb_txn_commit", res);
         goto fail;
     }
 
     return 0;
 fail:
     mdb_txn_abort(txn);
-    return db_map_mdb_err(ret);
+    return db_map_mdb_err(res);
 }
 
 void ops_free(DB_operation_t** ops, size_t* n_ops)
@@ -598,8 +600,6 @@ void ops_free(DB_operation_t** ops, size_t* n_ops)
         }
 
         /* Clear other pointers for hygiene (optional) */
-        arr[i].prev  = NULL;
-        arr[i].next  = NULL;
         arr[i].dbi   = (MDB_dbi)0;
         arr[i].flags = 0;
         arr[i].type  = DB_OPERATION_NONE;
@@ -619,11 +619,11 @@ void ops_free(DB_operation_t** ops, size_t* n_ops)
 static int _dbi_is_dupsort(MDB_txn* txn, MDB_dbi dbi, int* out_is_dupsort)
 {
     unsigned int flags = 0;
-    int          ret   = mdb_dbi_flags(txn, dbi, &flags);
-    if(ret != MDB_SUCCESS)
+    int          res   = mdb_dbi_flags(txn, dbi, &flags);
+    if(res != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("_dbi_is_dupsort:mdb_dbi_flags", ret);
-        return ret;
+        LMDB_LOG_ERR(LOG_TAG, "_dbi_is_dupsort:mdb_dbi_flags", res);
+        return res;
     }
     *out_is_dupsort = (flags & MDB_DUPSORT) ? 1 : 0;
     return 0;
@@ -631,25 +631,29 @@ static int _dbi_is_dupsort(MDB_txn* txn, MDB_dbi dbi, int* out_is_dupsort)
 
 static int _prepare_key(void_store_t** st, void* key_seg, size_t seg_size)
 {
+    int res = -1;
     if(key_seg && seg_size > 0)
     {
-        if(void_store_init(1, st) != 0)
+        res = void_store_init(1, st);
+        if(res != 0)
         {
-            EML_ERROR("db_ops", "prepare_key: void_store_init failed");
-            return -1;
+            EML_ERROR(LOG_TAG, "prepare_key: void_store_init failed");
+            return res;
         }
-        if(void_store_add(*st, key_seg, seg_size) != 0)
+
+        res = void_store_add(*st, key_seg, seg_size);
+        if(res != 0)
         {
-            EML_ERROR("db_ops", "prepare_key: void_store_add failed (seg_size=%zu)", seg_size);
-            return -1;
+            EML_ERROR(LOG_TAG, "prepare_key: void_store_add failed (seg_size=%zu)", seg_size);
+            return res;
         }
-        EML_DBG("db_ops", "prepare_key: seg_size=%zu", seg_size);
     }
     else if(key_seg && seg_size == 0)
     {
-        EML_ERROR("db_ops", "prepare_key: zero-length key passed in");
+        EML_ERROR(LOG_TAG, "prepare_key: zero-length key passed in");
         return -EINVAL;
     }
+    /* else: no key store; will try to use prev operation's dst as key */
     return 0;
 }
 
@@ -662,38 +666,6 @@ static void _prepare_op(DB_operation_t* op, DB_operation_type_t type, MDB_dbi db
     /* void stores */
     op->key_store = NULL;
     op->val_store = NULL;
-
-    /* linking */
-    op->prev = NULL;
-    op->next = NULL;
-}
-
-static void _ops_link(DB_operation_t* ops, size_t n_ops)
-{
-    /* Nothing to link */
-    if(n_ops <= 1) return;
-
-    /* Use size_t for indexing but compare with n_ops after cast */
-    for(size_t i = 0; i < n_ops; ++i)
-    {
-        DB_operation_t* op = &ops[i];
-
-        if(i == 0)
-        {
-            op->prev = NULL;
-            op->next = &ops[i + 1];
-        }
-        else if(i == n_ops - 1)
-        {
-            op->prev = &ops[i - 1];
-            op->next = NULL;
-        }
-        else
-        {
-            op->prev = &ops[i - 1];
-            op->next = &ops[i + 1];
-        }
-    }
 }
 
 static int _exec_op(MDB_txn* txn, DB_operation_t* op)
@@ -721,67 +693,67 @@ static int _op_get(MDB_txn* txn, DB_operation_t* op)
     MDB_val k    = {0};
     MDB_val v    = {0};
     void*   kbuf = NULL;
-    int     ret;
+    int     res;
 
-    EML_DBG("db_ops", "_op_get: starting get operation on dbi=%u", op->dbi);
+    EML_DBG(LOG_TAG, "_op_get: starting get operation on dbi=%u", op->dbi);
     /* If a key store exists, build key buffer from it */
     if(op->key_store)
     {
-        EML_DBG("db_ops", "_op_get: using key from key_store");
+        EML_DBG(LOG_TAG, "_op_get: using key from key_store");
         size_t ksize = void_store_size(op->key_store);
         if(ksize == 0)
         {
-            EML_ERROR("db_ops", "op_get: key_store present but size=0");
+            EML_ERROR(LOG_TAG, "op_get: key_store present but size=0");
             return EINVAL;
         }
         kbuf = void_store_malloc_buf(op->key_store);
         if(!kbuf)
         {
-            EML_ERROR("db_ops", "op_get: void_store_malloc_buf failed");
+            EML_ERROR(LOG_TAG, "op_get: void_store_malloc_buf failed");
             return ENOMEM;
         }
         k.mv_size = void_store_size(op->key_store);
         k.mv_data = kbuf;
-        EML_DBG("db_ops", "_op_get: built key from store, size=%zu", k.mv_size);
+        EML_DBG(LOG_TAG, "_op_get: built key from store, size=%zu", k.mv_size);
     }
     /* No key_store: try to use previous op's dst as key (runtime dependency) */
     else
     {
-        EML_DBG("db_ops", "_op_get: no key_store, attempting to use prev->dst as key");
+        EML_DBG(LOG_TAG, "_op_get: no key_store, attempting to use prev->dst as key");
         if(!op->prev || !op->prev->dst || op->prev->dst_len == 0)
         {
-            EML_ERROR("db_ops", "op_get: missing prev result for key");
+            EML_ERROR(LOG_TAG, "op_get: missing prev result for key");
             return EINVAL;
         }
         k.mv_size = op->prev->dst_len;
         k.mv_data = op->prev->dst; /* do NOT free this pointer here */
-        EML_DBG("db_ops", "_op_get: using prev->dst as key, size=%zu", k.mv_size);
+        EML_DBG(LOG_TAG, "_op_get: using prev->dst as key, size=%zu", k.mv_size);
     }
 
-    EML_DBG("db_ops", "_op_get: attempting get with key size=%zu", k.mv_size);
-    ret = mdb_get(txn, op->dbi, &k, &v);
+    EML_DBG(LOG_TAG, "_op_get: attempting get with key size=%zu", k.mv_size);
+    res = mdb_get(txn, op->dbi, &k, &v);
 
     /* free key buffer if allocated one */
     if(kbuf) free(kbuf);
 
-    if(ret != MDB_SUCCESS)
+    if(res != MDB_SUCCESS)
     {
-        if(ret == MDB_NOTFOUND)
+        if(res == MDB_NOTFOUND)
         {
-            EML_DBG("db_ops", "_op_get: key not found in dbi=%u, ret=%d", op->dbi, ret);
-            LMDB_EML_WARN("op_get:mdb_get NOTFOUND", ret);
+            EML_DBG(LOG_TAG, "_op_get: key not found in dbi=%u, res=%d", op->dbi, res);
+            LMDB_EML_WARN(LOG_TAG, "op_get:mdb_get NOTFOUND", res);
         }
         else
         {
-            LMDB_LOG_ERR("op_get:mdb_get", ret);
+            LMDB_LOG_ERR(LOG_TAG, "op_get:mdb_get", res);
         }
-        return ret;
+        return res;
     }
     /* copy value out to a new buffer owned by op->dst */
     void* buf = malloc(v.mv_size);
     if(!buf)
     {
-        EML_ERROR("db_ops", "op_get: malloc(%zu) failed", v.mv_size);
+        EML_ERROR(LOG_TAG, "op_get: malloc(%zu) failed", v.mv_size);
         return ENOMEM;
     }
     memcpy(buf, v.mv_data, v.mv_size);
@@ -790,19 +762,19 @@ static int _op_get(MDB_txn* txn, DB_operation_t* op)
     op->dst     = buf;
     op->dst_len = v.mv_size;
 
-    EML_DBG("db_ops", "_op_get: successfully retrieved value of size=%zu", v.mv_size);
+    EML_DBG(LOG_TAG, "_op_get: successfully retrieved value of size=%zu", v.mv_size);
     return 0;
 }
 
 static int _op_put(MDB_txn* txn, DB_operation_t* op)
 {
-    EML_DBG("db_ops", "_op_put: starting put operation on dbi=%u", op->dbi);
+    EML_DBG(LOG_TAG, "_op_put: starting put operation on dbi=%u", op->dbi);
 
     /* Build key buffer from store */
     void* kbuf = void_store_malloc_buf(op->key_store);
     if(!kbuf)
     {
-        EML_ERROR("db_ops", "op_put: key malloc_buf failed");
+        EML_ERROR(LOG_TAG, "op_put: key malloc_buf failed");
         return ENOMEM;
     }
 
@@ -811,7 +783,7 @@ static int _op_put(MDB_txn* txn, DB_operation_t* op)
     if(vlen == 0)
     {
         free(kbuf);
-        EML_ERROR("db_ops", "op_put: empty value");
+        EML_ERROR(LOG_TAG, "op_put: empty value");
         return EINVAL;
     }
 
@@ -821,7 +793,7 @@ static int _op_put(MDB_txn* txn, DB_operation_t* op)
     if(rc != MDB_SUCCESS)
     {
         free(kbuf);
-        LMDB_LOG_ERR("_op_put:mdb_dbi_flags", rc);
+        LMDB_LOG_ERR(LOG_TAG, "_op_put:mdb_dbi_flags", rc);
         return rc;
     }
     const int is_dups = (dbif & MDB_DUPSORT) != 0;
@@ -829,7 +801,7 @@ static int _op_put(MDB_txn* txn, DB_operation_t* op)
     MDB_val k = {0};
     k.mv_size = void_store_size(op->key_store);
     k.mv_data = kbuf;
-    int ret;
+    int res;
 
     if(is_dups)
     {
@@ -849,19 +821,19 @@ static int _op_put(MDB_txn* txn, DB_operation_t* op)
         v.mv_data = vbuf;
 
         /* DO NOT add MDB_RESERVE here */
-        ret = mdb_put(txn, op->dbi, &k, &v, op->flags);
-        if(ret != MDB_SUCCESS)
+        res = mdb_put(txn, op->dbi, &k, &v, op->flags);
+        if(res != MDB_SUCCESS)
         {
-            LMDB_LOG_ERR("op_put:mdb_put dupsort", ret);
+            LMDB_LOG_ERR(LOG_TAG, "op_put:mdb_put dupsort", res);
             free(vbuf);
             free(kbuf);
-            return ret;
+            return res;
         }
 
         /* We created a temporary value buffer; safe to free after put */
         free(vbuf);
         free(kbuf);
-        EML_DBG("db_ops", "_op_put: dupsort put completed");
+        EML_DBG(LOG_TAG, "_op_put: dupsort put completed");
         return 0;
     }
     else
@@ -873,25 +845,25 @@ static int _op_put(MDB_txn* txn, DB_operation_t* op)
         v.mv_size = vlen;
         v.mv_data = NULL;
 
-        ret = mdb_put(txn, op->dbi, &k, &v, op->flags | MDB_RESERVE);
-        if(ret != MDB_SUCCESS)
+        res = mdb_put(txn, op->dbi, &k, &v, op->flags | MDB_RESERVE);
+        if(res != MDB_SUCCESS)
         {
-            LMDB_LOG_ERR("op_put:mdb_put RESERVE", ret);
+            LMDB_LOG_ERR(LOG_TAG, "op_put:mdb_put RESERVE", res);
             free(kbuf);
-            return ret;
+            return res;
         }
 
         /* Encode into the reserved buffer */
         size_t wrote = void_store_memcpy(v.mv_data, v.mv_size, op->val_store);
         if(wrote != v.mv_size)
         {
-            EML_ERROR("db_ops", "op_put: encode mismatch wrote=%zu expected=%zu", wrote, v.mv_size);
+            EML_ERROR(LOG_TAG, "op_put: encode mismatch wrote=%zu expected=%zu", wrote, v.mv_size);
             free(kbuf);
             return EFAULT;
         }
 
         free(kbuf);
-        EML_DBG("db_ops", "_op_put: successfully wrote value to database");
+        EML_DBG(LOG_TAG, "_op_put: successfully wrote value to database");
         return 0;
     }
 }
@@ -907,13 +879,13 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
         size_t ksize = void_store_size(op->key_store);
         if(ksize == 0)
         {
-            EML_ERROR("db_ops", "op_rep: empty key_store");
+            EML_ERROR(LOG_TAG, "op_rep: empty key_store");
             return EINVAL;
         }
         kbuf = void_store_malloc_buf(op->key_store);
         if(!kbuf)
         {
-            EML_ERROR("db_ops", "op_rep: key malloc_buf failed");
+            EML_ERROR(LOG_TAG, "op_rep: key malloc_buf failed");
             return ENOMEM;
         }
         key.mv_size = ksize;
@@ -923,7 +895,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     {
         if(!op->prev || !op->prev->dst || op->prev->dst_len == 0)
         {
-            EML_ERROR("db_ops", "op_rep: missing prev->dst for key");
+            EML_ERROR(LOG_TAG, "op_rep: missing prev->dst for key");
             return EINVAL;
         }
         key.mv_size = op->prev->dst_len;
@@ -936,13 +908,13 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     if(rc != MDB_SUCCESS)
     {
         if(kbuf) free(kbuf);
-        LMDB_LOG_ERR("op_rep:mdb_dbi_flags", rc);
+        LMDB_LOG_ERR(LOG_TAG, "op_rep:mdb_dbi_flags", rc);
         return rc;
     }
     if(dbif & MDB_DUPSORT)
     {
         if(kbuf) free(kbuf);
-        EML_ERROR("db_ops", "op_rep: DUPSORT not supported; use delete+put instead");
+        EML_ERROR(LOG_TAG, "op_rep: DUPSORT not supported; use delete+put instead");
         return ENOTSUP; /* Explicitly surface to caller/test */
     }
 
@@ -952,7 +924,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     if(rc != MDB_SUCCESS)
     {
         if(kbuf) free(kbuf);
-        LMDB_LOG_ERR("op_rep:mdb_cursor_open", rc);
+        LMDB_LOG_ERR(LOG_TAG, "op_rep:mdb_cursor_open", rc);
         return rc;
     }
 
@@ -961,7 +933,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     rc = mdb_cursor_get(cur, &key, &val, MDB_SET_KEY);
     if(rc != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("op_rep:mdb_cursor_get SET_KEY", rc);
+        LMDB_LOG_ERR(LOG_TAG, "op_rep:mdb_cursor_get SET_KEY", rc);
         mdb_cursor_close(cur);
         if(kbuf) free(kbuf);
         return rc;
@@ -969,7 +941,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
 
     if(val.mv_size == 0)
     {
-        EML_ERROR("db_ops", "op_rep: cannot patch zero-length value");
+        EML_ERROR(LOG_TAG, "op_rep: cannot patch zero-length value");
         mdb_cursor_close(cur);
         if(kbuf) free(kbuf);
         return EINVAL;
@@ -979,7 +951,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     void* tmp = calloc(1, val.mv_size);
     if(!tmp)
     {
-        EML_ERROR("db_ops", "op_rep: malloc(%zu) failed", val.mv_size);
+        EML_ERROR(LOG_TAG, "op_rep: malloc(%zu) failed", val.mv_size);
         mdb_cursor_close(cur);
         if(kbuf) free(kbuf);
         return ENOMEM;
@@ -993,7 +965,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
      */
     if(!op->val_store)
     {
-        EML_ERROR("db_ops", "op_rep: no val_store provided for patch");
+        EML_ERROR(LOG_TAG, "op_rep: no val_store provided for patch");
         free(tmp);
         mdb_cursor_close(cur);
         if(kbuf) free(kbuf);
@@ -1003,7 +975,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     size_t need  = void_store_size(op->val_store);
     if(wrote != need)
     {
-        EML_ERROR("db_ops", "op_rep: void_store_memcpy failed wrote=%zu expected=%zu", wrote, need);
+        EML_ERROR(LOG_TAG, "op_rep: void_store_memcpy failed wrote=%zu expected=%zu", wrote, need);
         free(tmp);
         mdb_cursor_close(cur);
         if(kbuf) free(kbuf);
@@ -1015,7 +987,7 @@ static int _op_rep(MDB_txn* txn, DB_operation_t* op)
     rc           = mdb_cursor_put(cur, &key, &newv, MDB_CURRENT);
     if(rc != MDB_SUCCESS)
     {
-        LMDB_LOG_ERR("op_rep:mdb_cursor_put CURRENT", rc);
+        LMDB_LOG_ERR(LOG_TAG, "op_rep:mdb_cursor_put CURRENT", rc);
     }
 
     free(tmp);
@@ -1035,7 +1007,7 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
         kbuf = void_store_malloc_buf(op->key_store);
         if(!kbuf)
         {
-            EML_ERROR("db_ops", "op_del: key malloc_buf failed");
+            EML_ERROR(LOG_TAG, "op_del: key malloc_buf failed");
             return ENOMEM;
         }
         k.mv_size = void_store_size(op->key_store);
@@ -1043,7 +1015,7 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
         if(k.mv_size == 0)
         {
             free(kbuf);
-            EML_ERROR("db_ops", "op_del: empty key");
+            EML_ERROR(LOG_TAG, "op_del: empty key");
             return EINVAL;
         }
     }
@@ -1051,7 +1023,7 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
     {
         if(!op->prev || !op->prev->dst || op->prev->dst_len == 0)
         {
-            EML_ERROR("db_ops", "op_del: missing key (no key_store and no prev->dst)");
+            EML_ERROR(LOG_TAG, "op_del: missing key (no key_store and no prev->dst)");
             return EINVAL;
         }
         k.mv_size = op->prev->dst_len;
@@ -1060,11 +1032,11 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
 
     /* --- Is this a dupsort DB? --- */
     int is_dups = 0;
-    int ret     = _dbi_is_dupsort(txn, op->dbi, &is_dups);
-    if(ret != MDB_SUCCESS)
+    int res     = _dbi_is_dupsort(txn, op->dbi, &is_dups);
+    if(res != MDB_SUCCESS)
     {
         if(kbuf) free(kbuf);
-        return db_map_mdb_err(ret);
+        return db_map_mdb_err(res);
     }
 
     /* --- Optional value (for exact dup delete) --- */
@@ -1081,7 +1053,7 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
             if(!vbuf)
             {
                 if(kbuf) free(kbuf);
-                EML_ERROR("db_ops", "op_del: val malloc_buf failed");
+                EML_ERROR(LOG_TAG, "op_del: val malloc_buf failed");
                 return ENOMEM;
             }
             v.mv_size = vlen;
@@ -1096,19 +1068,18 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
         if(vlen > 0)
         {
             delret = mdb_del(txn, op->dbi, &k, &v);  // exact dup delete
-            EML_DBG("db_ops", "op_del: dupsort exact key_len=%zu val_len=%zu", k.mv_size,
-                    v.mv_size);
+            EML_DBG(LOG_TAG, "op_del: dupsort exact key_len=%zu val_len=%zu", k.mv_size, v.mv_size);
         }
         else
         {
             delret = mdb_del(txn, op->dbi, &k, NULL);  // all dups for key
-            EML_DBG("db_ops", "op_del: dupsort all-for-key key_len=%zu", k.mv_size);
+            EML_DBG(LOG_TAG, "op_del: dupsort all-for-key key_len=%zu", k.mv_size);
         }
     }
     else
     {
         delret = mdb_del(txn, op->dbi, &k, NULL);
-        EML_DBG("db_ops", "op_del: single key key_len=%zu", k.mv_size);
+        EML_DBG(LOG_TAG, "op_del: single key key_len=%zu", k.mv_size);
     }
 
     if(vbuf) free(vbuf);
@@ -1116,11 +1087,11 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op)
 
     if(delret != MDB_SUCCESS && delret != MDB_NOTFOUND)
     {
-        LMDB_LOG_ERR("op_del:mdb_del", delret);
+        LMDB_LOG_ERR(LOG_TAG, "op_del:mdb_del", delret);
     }
     else if(delret == MDB_NOTFOUND)
     {
-        LMDB_EML_WARN("op_del:mdb_del NOTFOUND (idempotent)", delret);
+        LMDB_EML_WARN(LOG_TAG, "op_del:mdb_del NOTFOUND (idempotent)", delret);
     }
 
     return 0;
