@@ -13,60 +13,88 @@ This document summarizes the LMDB wrapper around `db_lmdb_*` in terms of compone
 - **External dependencies**: LMDB (storage engine) and `emlog` (logging).
 
 ```mermaid
+%% Column view with logging visible
 flowchart TB
-    subgraph API [Public API]
-        api["db_lmdb"]
+    subgraph App [DB app packages]
+        api[API]
+        core[CORE]
+        ops[OPS]
+        vs[void_store]
     end
 
-    subgraph Core [Core]
-        core["db_lmdb_core"]
+    subgraph DB_specific [DB specific]
+        db[DB]
+        dbi[DBI]
     end
 
-    subgraph DBI [DBI Management]
-        dbi["db_lmdb_dbi.* / descriptor cache"]
-    end
-
-    subgraph Internal [Internal]
-        internal["db_lmdb_internal.h / DB struct + config + logging"]
-    end
-
-    subgraph Ops [Operations Layer]
-        ops["db_lmdb_ops (PUT/GET/REP/DEL)"]
-    end
-    subgraph LMDB [lmdb]
+    subgraph Internals [internals]
+        internal[db_lmdb_internal.h / DB struct + config]
         lmdb[(LMDB)]
     end
 
-    subgraph Utils [Utilities]
-        vs["void_store segmented key/value builder"]
-        emlog[(emlog logging)]
+    subgraph Col4 [EMlog]
+        emlog[EMlog]
     end
 
+    api --> core --> ops --> vs
+    DB_specific --> internal
+    App --> DB_specific
 
-    api --> core
-    api --> ops
-
-    core --> internal
-    core --> lmdb
-    core --> dbi
-
-    dbi --> internal
-    dbi --> lmdb
-
-    ops --> internal
-    ops --> lmdb
-    ops --> vs
-    internal --> emlog
-    dbi --> lmdb
-    ops --> lmdb
-
+    internal --> lmdb
+    internal -.-> emlog
 ```
 
-Guiding rules:
+```mermaid
+%% Core-only wiring (no externals shown)
+flowchart TB
+    api_core[db_lmdb API]
+    core_core[db_lmdb_core safety/retry]
+    dbi_core[db_lmdb_dbi descriptor cache]
+    ops_core[db_lmdb_ops PUT/GET/REP/DEL]
+    vs_core[void_store ops-only]
+    internal_core[db_lmdb_internal.h / DB struct + config]
 
+    api_core --> core_core
+    core_core --> dbi_core
+    dbi_core --> ops_core
+    ops_core --> vs_core
+    core_core --> internal_core
+    dbi_core --> internal_core
+    ops_core --> internal_core
+```
+
+```mermaid
+%% Package view without logging clutter
+flowchart LR
+    subgraph Public
+        api_pkg[db_lmdb]
+    end
+    subgraph Core
+        core_pkg[db_lmdb_core]
+        dbi_pkg[db_lmdb_dbi]
+        internal_pkg[db_lmdb_internal.h / DB struct + config]
+    end
+    subgraph Ops
+        ops_pkg[db_lmdb_ops]
+        vs_pkg[void_store]
+    end
+    lmdb_pkg[(LMDB)]
+
+    api_pkg --> core_pkg
+    core_pkg --> dbi_pkg
+    dbi_pkg --> ops_pkg
+    ops_pkg --> vs_pkg
+    core_pkg --> internal_pkg
+    dbi_pkg --> internal_pkg
+    ops_pkg --> internal_pkg
+    internal_pkg --> lmdb_pkg
+```
+
+Guiding rules (key boundaries):
+- `void_store` is an ops-only utility; keep it out of other packages.
+- `emlog` is pulled through `db_lmdb_internal.h`, so everything logs via that shim (shown once in the Infra/EMlog columns).
 - Public callers only depend on `db_lmdb.h` and optionally `db_lmdb_ops.h`.
-- `void_store` stays encapsulated inside the operations layer; other packages should not include it.
-- DBI descriptors (`dbi_desc_t`) are the bridge between DBI setup and operations; they are owned by the `DB` singleton.
+- DBI descriptors (`dbi_desc_t`) bridge DBI setup and ops; they live on the `DB` singleton.
 
 ## Dynamic Architecture
 
