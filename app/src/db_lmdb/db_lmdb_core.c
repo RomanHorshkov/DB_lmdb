@@ -113,6 +113,8 @@ int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size
 retry:
 {
     int res = mdb_txn_begin(env, NULL, flags, out_txn);
+    /* keep this light check to avoid jumping into safety check 
+    function on hot path */
     if(res != 0)
     {
         int act = _safety_check(res, 0, &budget, out_err, out_txn);

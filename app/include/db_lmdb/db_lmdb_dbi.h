@@ -22,7 +22,7 @@ extern "C"
 /**
  * @brief Sentinel value used to request automatic default put flags.
  *
- * When a caller supplies this value for the @p put_flags_default parameter
+ * When a caller supplies this value for the @p put_flags parameter
  * of `db_lmdb_dbi_init`, the implementation will select a safe default based
  * on the resolved DB flags:
  *  - Non-DUPSORT: MDB_NOOVERWRITE (enforce unique keys)
@@ -37,14 +37,14 @@ extern "C"
  */
 typedef struct
 {
-    MDB_dbi     dbi;               /**< LMDB handle. */
-    const char* name;              /**< Logical name (non-owning). */
-    dbi_type_t  type;              /**< Requested logical type (flags). */
-    unsigned    open_flags;        /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
-    unsigned    db_flags;          /**< Cached mdb_dbi_flags(txn, dbi). */
-    unsigned    put_flags_default; /**< Default flags to OR into mdb_put calls. */
-    int         is_dupsort;        /**< Non-zero if DB uses MDB_DUPSORT. */
-    int         is_dupfixed;       /**< Non-zero if DB uses MDB_DUPFIXED. */
+    MDB_dbi     dbi;         /**< LMDB handle. */
+    const char* name;        /**< Logical name (non-owning). */
+    dbi_type_t  type;        /**< Requested logical type (flags). */
+    unsigned    open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
+    unsigned    db_flags;    /**< Cached mdb_dbi_flags(txn, dbi). */
+    unsigned    put_flags;   /**< Default flags to OR into mdb_put calls. */
+    int         is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
+    int         is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
 } dbi_desc_t;
 
 /**
