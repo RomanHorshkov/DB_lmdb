@@ -187,28 +187,24 @@ retry:
     MDB_val k = {.mv_data = (void*)key, .mv_size = klen};
     MDB_val v = {.mv_size = vlen, .mv_data = NULL};
 
+    int mapped_err = 0;
+    int mdb_rc     = 0;
+
     /* DUPSORT path: pass actual value bytes, no MDB_RESERVE */
     if(desc->is_dupsort)
     {
         /* set ptr to put */
         v.mv_data = (void*)val;
-        res       = mdb_put(txn, desc->dbi, &k, &v, desc->put_flags);
-        /* keep this light check to avoid jumping into safety check 
-        function on hot path */
-        if(res != MDB_SUCCESS)
+        switch(db_lmdb_put_safe(txn, desc->dbi, &k, &v, desc->put_flags, &retry_budget, &mdb_rc,
+                                &mapped_err))
         {
-            switch(db_lmdb_safety_check(res, 1, &retry_budget, &res, txn))
-            {
-                case DB_LMDB_SAFE_RETRY:
-                    EML_WARN(LOG_TAG, "ops_put_one: retrying dupsort put, retry_budget=%zu",
-                             retry_budget);
-                    goto retry;
-                case DB_LMDB_SAFE_OK: /* should not happen */
-                    EML_ERROR(LOG_TAG, "put_one: unexpected SAFE_OK on dupsort put");
-                    break;
-                default:
-                    goto fail;
-            }
+            case DB_LMDB_SAFE_OK:
+                break;
+            case DB_LMDB_SAFE_RETRY:
+                goto retry;
+            default:
+                res = mapped_err ? mapped_err : db_map_mdb_err(mdb_rc);
+                goto fail;
         }
     }
 
@@ -217,23 +213,16 @@ retry:
     {
         v.mv_data = NULL;
         /* Reserve space to write directly later  */
-        res       = mdb_put(txn, desc->dbi, &k, &v, MDB_RESERVE);
-        /* keep this light check to avoid jumping into safety check 
-        function on hot path */
-        if(res != MDB_SUCCESS)
+        switch(db_lmdb_put_safe(txn, desc->dbi, &k, &v, MDB_RESERVE, &retry_budget, &mdb_rc,
+                                &mapped_err))
         {
-            switch(db_lmdb_safety_check(res, 1, &retry_budget, &res, txn))
-            {
-                case DB_LMDB_SAFE_RETRY:
-                    EML_WARN(LOG_TAG, "ops_put_one: retrying dupsort put, retry_budget=%zu",
-                             retry_budget);
-                    goto retry;
-                case DB_LMDB_SAFE_OK: /* should not happen */
-                    EML_ERROR(LOG_TAG, "put_one: unexpected SAFE_OK on dupsort put");
-                    break;
-                default:
-                    goto fail;
-            }
+            case DB_LMDB_SAFE_OK:
+                break;
+            case DB_LMDB_SAFE_RETRY:
+                goto retry;
+            default:
+                res = mapped_err ? mapped_err : db_map_mdb_err(mdb_rc);
+                goto fail;
         }
 
         /* Fill reserved page now that LMDB has placed the record */
