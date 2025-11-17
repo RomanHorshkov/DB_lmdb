@@ -10,7 +10,10 @@
 #include "db_lmdb_ops.h"      /* db_internal.h -> lmdb.h, stdio, stdlib, string, time */
 #include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
 #include "db_lmdb_internal.h" /* interface, config, emlog */
+#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */
 #include "void_store.h"
+
+#include <lmdb.h>
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -152,6 +155,64 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op);
 DB_operation_t* ops_create(size_t n_ops)
 {
     return (DB_operation_t*)calloc(n_ops, sizeof(DB_operation_t));
+}
+
+int ops_put_one(const dbi_desc_t const* desc, const void const* key, const size_t klen,
+                const void const* val, const size_t vlen)
+{
+    if(!desc || !key || !val || klen == 0 || vlen == 0)
+    {
+        EML_ERROR(LOG_TAG, "ops_put_one_desc: invalid input");
+        return -EINVAL;
+    }
+
+    MDB_txn* txn          = NULL;
+    int      res          = 0;
+    size_t   retry_budget = 2;
+
+retry:
+{
+    /* Begin transaction */
+    switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &retry_budget, &res))
+    {
+        case DB_LMDB_SAFE_OK:
+            break;
+        case DB_LMDB_SAFE_RETRY:
+            goto retry;
+        default:
+            goto fail;
+    }
+
+    /* Prepare key/value variables */
+    MDB_val k = {.mv_data = (void*)key, .mv_size = klen};
+    MDB_val v = {0};
+
+    /* ---- DUPSORT path: pass actual value bytes, NO MDB_RESERVE ---- */
+    if((desc->db_flags & MDB_DUPSORT) != 0)
+    {
+        v.mv_size = vlen;
+        v.mv_data = (void*)val;
+        res       = mdb_put(txn, desc->dbi, &k, &v, 0);
+        /* keep this light check to avoid jumping into safety check 
+        function on hot path */
+        if(res != MDB_SUCCESS)
+        {
+            switch(db_lmdb_safety_check(res, 1, &retry_budget, &res, txn))
+            {
+                case DB_LMDB_SAFE_RETRY:
+                    goto retry;
+                case DB_LMDB_SAFE_OK: /* should not happen */
+                    EML_ERROR(LOG_TAG, "put_one: unexpected SAFE_OK on dupsort put");
+                    goto fail;
+                default:
+                    goto fail;
+            }
+        }
+    }
+}
+
+fail:
+    return res;
 }
 
 static int _ops_put_one_impl(MDB_dbi dbi, const void* key, size_t klen, const void* val,

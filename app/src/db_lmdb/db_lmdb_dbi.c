@@ -2,7 +2,7 @@
  * @file db_lmdb_dbi.c
  */
 
-#include "db_lmdb_dbi.h"
+#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */
 #include "db_lmdb_core.h"
 #include "db_lmdb_internal.h" /* interface, config, emlog */
 
@@ -80,7 +80,7 @@ static inline int _DB_is_ok()
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
 static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
-                         dbi_desc_t* out, uint8_t* open_retry_budget, uint8_t* flags_retry_budget,
+                         dbi_desc_t* out, size_t* open_retry_budget, size_t* flags_retry_budget,
                          int* out_err);
 
 /****************************************************************************
@@ -116,14 +116,17 @@ int db_lmdb_dbi_init(const dbi_decl_t* dbis, const size_t n_dbis)
         goto fail;
     }
 
-    uint8_t open_retry_budget  = DB_LMDB_RETRY_DBI_OPEN;
-    uint8_t flags_retry_budget = DB_LMDB_RETRY_DBI_FLAGS;
+    size_t open_retry_budget  = DB_LMDB_RETRY_DBI_OPEN;
+    size_t flags_retry_budget = DB_LMDB_RETRY_DBI_FLAGS;
 
-    MDB_txn* txn = NULL;
+    size_t txn_retry_budget = DB_LMDB_RETRY_TRANSACTION;
+
+    MDB_txn* txn            = NULL;
+    size_t   opened_dbi_idx = 0;
 retry:
 {
     /* Begin transaction */
-    switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &res))
+    switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &txn_retry_budget, &res))
     {
         case DB_LMDB_SAFE_OK:
             break;
@@ -133,27 +136,35 @@ retry:
             goto fail;
     }
 
-    for(size_t i = 0; i < n_dbis; ++i)
+    for(opened_dbi_idx; opened_dbi_idx < n_dbis; ++opened_dbi_idx)
     {
-        int mapped_err = 0;
-        int act = _dbi_init_one(txn, &dbis[i], DBI_PUT_FLAGS_AUTO, &DB->dbis[i], &open_retry_budget,
-                                &flags_retry_budget, &mapped_err);
-        if(act == DB_LMDB_SAFE_OK) continue;
+        int act =
+            _dbi_init_one(txn, &dbis[opened_dbi_idx], DBI_PUT_FLAGS_AUTO, &DB->dbis[opened_dbi_idx],
+                          &open_retry_budget, &flags_retry_budget, &res);
 
-        res = mapped_err ? mapped_err : -EIO;
-        if(act == DB_LMDB_SAFE_RETRY)
+        switch(act)
         {
-            goto retry;
+            case DB_LMDB_SAFE_OK:
+                continue;
+            case DB_LMDB_SAFE_RETRY:
+                EML_WARN(LOG_TAG, "_dbi_init: retrying at dbi %zu", opened_dbi_idx);
+                goto retry;
+            default:
+                EML_ERROR(LOG_TAG, "_dbi_init: failed at dbi %zu", opened_dbi_idx);
+                goto fail;
         }
-        LMDB_LOG_ERR(LOG_TAG, "db_lmdb_dbi_init:desc_init failed", res);
-        goto fail;
     }
 
-    res = mdb_txn_commit(txn);
-    if(res != MDB_SUCCESS)
+    switch(db_lmdb_txn_commit_safe(txn, &txn_retry_budget, &res))
     {
-        LMDB_LOG_ERR(LOG_TAG, "db_lmdb_dbi_init:txn_commit failed", res);
-        goto fail;
+        case DB_LMDB_SAFE_OK:
+            break;
+        case DB_LMDB_SAFE_RETRY:
+            EML_WARN(LOG_TAG, "db_lmdb_dbi_init: retrying txn commit");
+            goto retry;
+        default:
+            EML_PERR(LOG_TAG, "db_lmdb_dbi_init:txn_commit_safe failed with err %d", res);
+            goto fail;
     }
 
     EML_DBG(LOG_TAG, "Successfully opened all sub dbis");
@@ -171,7 +182,7 @@ fail:
  */
 
 static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
-                         dbi_desc_t* out, uint8_t* open_retry_budget, uint8_t* flags_retry_budget,
+                         dbi_desc_t* out, size_t* open_retry_budget, size_t* flags_retry_budget,
                          int* out_err)
 {
     if(out_err) *out_err = 0;

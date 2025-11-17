@@ -10,6 +10,7 @@
 #define DB_LMDB_CORE_H
 
 #include <lmdb.h>
+#include <stddef.h>
 #include <stdint.h>
 
 enum db_lmdb_safety_ret_code
@@ -19,8 +20,9 @@ enum db_lmdb_safety_ret_code
     DB_LMDB_SAFE_FAIL    /* fail with mapped errno */
 };
 
-#define DB_LMDB_RETRY_DBI_OPEN  3
-#define DB_LMDB_RETRY_DBI_FLAGS 3
+#define DB_LMDB_RETRY_TRANSACTION 2
+#define DB_LMDB_RETRY_DBI_OPEN    3
+#define DB_LMDB_RETRY_DBI_FLAGS   3
 
 /**
  * @brief Create an LMDB environment using safety policy (no retry here).
@@ -40,10 +42,12 @@ int db_lmdb_create_env_safe(struct DB* DataBase, const char* path, unsigned int 
  * @param env        LMDB environment.
  * @param flags      LMDB transaction flags.
  * @param out_txn    Filled with started transaction on success.
+ * @param retry_budget Optional retry counter (decremented on retry). May be NULL.
  * @param out_err    Optional mapped errno on FAIL.
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
-int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, int* out_err);
+int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size_t* retry_budget,
+                           int* out_err);
 
 /**
  * @brief Commit a transaction using safety policy (resize+retry baked in).
@@ -68,7 +72,7 @@ int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err);
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
 int db_lmdb_dbi_open_safe(MDB_txn* txn, const char* name, unsigned int open_flags, MDB_dbi* out_dbi,
-                          uint8_t* retry_budget, int* out_mdb_rc, int* out_err);
+                          size_t* retry_budget, int* out_mdb_rc, int* out_err);
 
 /**
  * @brief Fetch DBI flags using the safety policy (resize+retry guidance).
@@ -82,6 +86,12 @@ int db_lmdb_dbi_open_safe(MDB_txn* txn, const char* name, unsigned int open_flag
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
 int db_lmdb_dbi_get_flags_safe(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags,
-                               uint8_t* retry_budget, int* out_mdb_rc, int* out_err);
+                               size_t* retry_budget, int* out_mdb_rc, int* out_err);
+
+/**
+ * @brief Expose the core safety decision helper for callers needing fine control.
+ */
+int db_lmdb_safety_check(int mdb_rc, int is_write_txn, size_t* retry_budget, int* out_mapped_err,
+                         MDB_txn* txn);
 
 #endif /* DB_LMDB_CORE_H */

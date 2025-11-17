@@ -27,10 +27,6 @@
 #ifndef DB_OPERATIONS_H
 #define DB_OPERATIONS_H
 
-#include <lmdb.h>
-
-#include "db_lmdb_dbi.h"
-#include "void_store.h"
 
 #ifdef __cplusplus
 extern "C"
