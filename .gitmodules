@@ -1,0 +1,6 @@
+[submodule "EMlog"]
+	path = EMlog
+	url = git@github.com:RomanHorshkov/EMlog.git
+[submodule "app/external/EMlog"]
+	path = app/external/EMlog
+	url = git@github.com:RomanHorshkov/EMlog.git
