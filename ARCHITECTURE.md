@@ -13,28 +13,32 @@ flowchart LR
         api[API]
         core[CORE]
         ops[OPS]
+        api --> core --> ops
     end
 
     subgraph DB_specific [DB specific]
         db[DB]
         dbi[DBI]
+        database[(DataBase)]
+        db --> database
+        dbi --> database
     end
 
     subgraph Internals [Internals]
-        config[db_lmdb_config]
-        lmdb[(LMDB)]
+        config[CONF]
     end
 
-    subgraph Col4 [Externals]
+    subgraph Externals [Externals]
         emlog[EMlog]
+        lmdb[lmdb]
     end
 
-    api --> core --> ops
+    
     DB_specific --> Internals
     core --> DB_specific
     ops --> DB_specific
 
-    Internals -.-> emlog
+    Internals --> Externals
 ```
 
 ### DB app packages
