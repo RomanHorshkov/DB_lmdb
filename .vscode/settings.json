@@ -9,6 +9,9 @@
         "db_lmdb_ops.h": "c",
         "db_lmdb_config.h": "c",
         "lmdb.h": "c",
-        "common.h": "c"
+        "common.h": "c",
+        "security.h": "c",
+        "initializer_list": "c",
+        "typeinfo": "c"
     }
 }

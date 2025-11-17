@@ -8,8 +8,7 @@
 #include <errno.h>
 // #include <lmdb.h>   /* ret codes */
 
-#include "db.h"         /* DB, DataBase, common, stddef, stdintm  */
-
+#include "db.h" /* DB, DataBase, common, stddef, stdintm  */
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -140,7 +139,6 @@ int _map_mdb_err_to_errno(int rc)
             return -rc;        /* unknown error, let pass the code */
     }
 }
-
 
 int db_env_mapsize_expand(void)
 {

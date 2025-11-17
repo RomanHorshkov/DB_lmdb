@@ -7,9 +7,9 @@
  * (c) 2025
  */
 
-#include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
-#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */
-#include "db_lmdb_internal.h" /* interface, config, emlog */
+#include "db_lmdb.h" /* interface, config, emlog */
+#include "common.h"
+#include "core.h"    /* db_lmdb_create_env_safe etc */
 
 /****************************************************************************
  * PRIVATE DEFINES

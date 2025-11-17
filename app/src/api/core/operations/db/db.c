@@ -9,6 +9,8 @@
  * (c) 2025
  */
 
+#include "db.h"
+
 /****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
@@ -21,47 +23,10 @@
  ****************************************************************************
  */
 
-/**
- * @brief Main LMDB database structure.
- */
-typedef struct
-{
-    MDB_env*    env;                /* LMDB environment */
-    dbi_desc_t* dbis;               /* array of DBI descriptors */
-    uint8_t     n_dbis;             /* number of DBIs in array */
-    size_t      map_size_bytes;     /* current map size */
-    size_t      map_size_bytes_max; /* maximum map size */
-} DataBase;
-
-/************************************************************************
- * PRIVATE VARIABLES
- ****************************************************************************
- */
-
-/* Global DB handle */
-DataBase_t* DataBase = NULL;
-
 /************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
  ****************************************************************************
  */
-
-/**
- * @brief Compute the LMDB open flags for a given @p type.
- *
- * This helper always includes MDB_CREATE so callers can rely on the flag
- * set enabling creation of the named DB when opening via `mdb_dbi_open`.
- *
- * @param type Logical DB type from `dbi_type_t`.
- * @return A bitmask of MDB_* flags appropriate for `mdb_dbi_open`.
- */
-static inline unsigned _dbi_open_flags(dbi_type_t type)
-{
-    unsigned flags = MDB_CREATE;
-    if(type & DBI_TYPE_DUPSORT) flags |= MDB_DUPSORT;
-    if(type & DBI_TYPE_DUPFIXED) flags |= MDB_DUPFIXED;
-    return flags;
-}
 
 /**
  * @brief Choose a safe default set of mdb_put flags from cached DB flags.
@@ -78,9 +43,33 @@ static inline unsigned dbi_desc_default_put_flags(unsigned db_flags)
     return (db_flags & MDB_DUPSORT) ? MDB_NODUPDATA : MDB_NOOVERWRITE;
 }
 
-static inline int _DB_is_ok()
+/**
+ * Compute mdb_dbi_open() flags from a dbi_type_t bitmask.
+ *
+ * This helper builds the set of flags to pass to mdb_dbi_open() by starting
+ * with MDB_CREATE (so the DBI is created if it does not exist) and then
+ * enabling additional LMDB behaviors based on the supplied dbi type bits:
+ * - DBI_TYPE_DUPSORT  -> adds MDB_DUPSORT  (allows multiple values per key, sorted)
+ * - DBI_TYPE_DUPFIXED -> adds MDB_DUPFIXED (duplicates are fixed-size values)
+ *
+ * Any dbi_type_t bits that do not map to a known LMDB flag are ignored.
+ *
+ * @param type Bitmask of DBI type flags (e.g. DBI_TYPE_DUPSORT, DBI_TYPE_DUPFIXED).
+ * @return Unsigned flags suitable for passing to mdb_dbi_open().
+ */
+/**
+ * @brief Compute mdb_dbi_open flags from requested dbi_type_t.
+ * 
+ * @param type Requested DBI type.
+ * @return Computed mdb_dbi_open flags.
+ */
+static inline unsigned _dbi_open_flags_from_type(dbi_type_t type)
 {
-    return (DB && DB->env) ? 1 : 0;
+    /* basic mdb create flag */
+    unsigned flags = MDB_CREATE;
+    if(type & DBI_TYPE_DUPSORT) flags |= MDB_DUPSORT;
+    if(type & DBI_TYPE_DUPFIXED) flags |= MDB_DUPFIXED;
+    return flags;
 }
 
 /**

@@ -61,14 +61,14 @@ typedef enum
  */
 typedef struct
 {
-    unsigned int dbi;         /**< LMDB handle. */
-    const char*  name;        /**< Logical name (non-owning). */
-    dbi_type_t   type;        /**< Requested logical type (flags). */
-    unsigned     open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
-    unsigned     db_flags;    /**< Cached mdb_dbi_flags(txn, dbi). */
-    unsigned     put_flags;   /**< Default flags to OR into mdb_put calls. */
-    int          is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
-    int          is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
+    unsigned int dbi; /**< LMDB handle. */
+    // const char*  name;        /**< Logical name (non-owning). */
+    dbi_type_t type;        /**< Requested logical type (flags). */
+    unsigned   open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
+    unsigned   db_flags;    /**< Cached mdb_dbi_flags(txn, dbi). */
+    unsigned   put_flags;   /**< Default flags to OR into mdb_put calls. */
+    int        is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
+    int        is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
 } dbi_desc_t;
 
 /**
