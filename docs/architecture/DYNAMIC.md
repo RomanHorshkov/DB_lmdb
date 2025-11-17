@@ -1,6 +1,6 @@
 # Dynamic Architecture: LMDB Wrapper
 
-This document explains typical control flows through the LMDB wrapper. Diagrams use PlantUML rendered by CI into SVGs (no Mermaid). Pair this with `STATIC.md` for the structural view.
+This document explains typical control flows through the LMDB wrapper. Diagrams use PlantUML rendered locally into SVGs (no Mermaid). Pair this with `STATIC.md` for the structural view.
 
 ## Scope
 - Environment and DBI initialization, showing how `db.h` exposes `dbi` descriptors.

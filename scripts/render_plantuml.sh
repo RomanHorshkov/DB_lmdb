@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Render PlantUML diagrams to SVGs under docs/plantuml/generated.
-# Intended for CI; keep local workstations free from SVG generation if desired.
+# Intended for local/manual runs (no CI pipeline).
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLANTUML_DIR="${ROOT_DIR}/docs/plantuml"
@@ -10,12 +10,27 @@ OUT_DIR="${PLANTUML_DIR}/generated"
 
 mkdir -p "${OUT_DIR}"
 
-pushd "${PLANTUML_DIR}" >/dev/null
-plantuml -tsvg -o "$(basename "${OUT_DIR}")" \
-  static_architecture.puml \
-  dynamic_init.puml \
-  dynamic_ops.puml \
-  examples/architecture_example.puml
-popd >/dev/null
+USE_SERVER="${PLANTUML_USE_SERVER:-}"
+
+if [[ -z "${USE_SERVER}" ]] && command -v plantuml >/dev/null 2>&1; then
+  echo "Rendering with local plantuml binary..."
+  pushd "${PLANTUML_DIR}" >/dev/null
+  plantuml -tsvg -o "$(basename "${OUT_DIR}")" \
+    static_architecture.puml \
+    dynamic_init.puml \
+    dynamic_ops.puml \
+    examples/architecture_example.puml
+  popd >/dev/null
+else
+  echo "Using plantuml.com server to download rendered SVGs ..."
+  declare -A URLS
+  URLS["static_architecture"]="https://www.plantuml.com/plantuml/svg/dLLVRvim47_dKrZPmxQ7PeKq9PEggWJCDgdTghNJ7YC776BLsCWsRRLfqZx4Fk4-oSu44aF9oo8HdUz-T_UxFuOhROWoTSczr-ZE494JBWL5jvm8y-tc6hqH4j5dGvKW736HyJgd-YtQI8K-CFEnNfyeAdAgQ8vOIGggqICZ1tTDrIDLKqy_C54HHKgajoINJqmKQ4Eufev5oLhaiLI2AhHmz6kIFHIjaKFULsdpSn1vnP1_Tkfgw8RKtAHIcC-af6WIAKRuP1nnntvGy7zfl8VA8yuAKL9X4ASRus0YfUHJooYOdy_mScYytxBiGL2jaJ-T3us7n3F7L46jq4NqqqDeEQmRupI0ki4Y5RIyrSxy02zyqDg8hSxt_KKGjhgkl5zkhsa6moxuBfFZUPhwOH3rF6V3Z6sr8moJ9OvI39QlpYpFUvapMLQmOT3F_yZify7xMJZQcpaEWPERIKXpf96mFI5EXi5nD5-SndrIOHmaVj0Bosa16tyay2ADqdWOE5ucS-oFLZlQcOkBgbvpbbrUZcT9uZJ6uOlU0FjPSYmY4xixV2ncck8pV3wCkSH-C8iXfcUOWMMvlacMwBiYLGLp_VlxZtrb69R1dQTFdjSjx-IseOzqhJOaevCcus7katozucM-dcudo2cLQ4GgDaI-1ENh8OQDWTXgQtdlES4o7cMooi0upIRMquhZ89jeXm6f5_jBfO-6bfLklK3gGnuborVQjBbxCmBumMfpEMuTRBf5xo2SsB1Yru2-VtToNPlvnIYw_TGmiWHTCxxXicWij0J9ys0WwEJaSjUKxW0--RgLR9UR_-xiMUZ-04yZszBXQMIdhWDuJxRps2iwjxsY4nfjKq5Fqp9lBhzYnTOWkR6KyNCbDMrc1utJ4cM4SwfWu4HujQPDCV1jorO6sMzWeLbEKRASUlQsst2UTmMY_LJ-0m"
+  URLS["dynamic_init"]="https://www.plantuml.com/plantuml/svg/VLNBRjim4BppAnRkeJQQk74UpUCGH7u10PmYGDApi9RMCX6AL4cwJbeKwAaVKFGByoLTIh8jnsbya2NkpExiS2LUEO_MBt8btiETHvsYCfhWLg7sNsucC3CMf9OUPieieQqDqACdgr7nSg8MARbELxW7gGkqc8EROsgMKcSmG-Me4R5ceTE1iPeid3NMfvWyP7LGSRLtu_BNGAI5XDxnGNE5PhXGVcoq_umvGIko4bNhTSIT_4xCtmtUSokHafdEINjGDFCDJ6IjMTQA3ay-7OtwBuFtSvayQ78EUjsJby5DuQEcE_HrGJeX-27WjGe04pcZYTJKDpObMqVFZwEZ_bapkkFPsJWQ3nXnoxif4rdmzcsbw8qFpuzENm1UPXcTZ4vB5GrGQAGE7unxfuVHRdZL9y0Dku4PbQP2mgwIvTM-UTpICkWFJqQzEl2VJduAuQLN1DVhuNl-zHT8VuCFCEnVivL-KGY1YMTML1I03WQe55SiDl8WkhqEaLOwZLNEbp3BhIq4ZoHjGH9Us8Q4Uar4EfLreXGzJj4HJ6w6_H8JRbf2L59W_x9KS07D-kt0JobHRWzqICR_ENcCKsax8k2PLihQy19Bw2dc_cE7CsglyCp4nrKEB6B7Uz4H9PcJbAek82G8p2e9V0pcnSnBfsxzK0GcFmMSAKZNETOD3Flxby5zJf4-YPNAuCn6vCgNzbPp7H5GkotvHnrFAPEwwgWkq17AcAByxX0cSrXv5NiU683NKmLG45rbuiHScxyBUpmucB60jvaP6r026tHURz3MdIOiYMfDBeazj4jYLOuBaKxVw3OnUIxzkafjp6P6EAML1G-q0yTNIi7eqlXWOsLvI5oDraMr5QLJtBj5BursGYZAM0LOcSszs6SwcALszPlJK8xMubEN4P5IrQ0adDXnIVK4toH2yts0e1cM5Wkkv09hOh8iVERvtVNamC_v9flpeL2T3jqvFF_-0wCRPR9mR7W-6LW7dnKihf8en1LVmz7p3m"
+  URLS["dynamic_ops"]="https://www.plantuml.com/plantuml/svg/VLLTJzim57tthxZg7bQsDL0-1dGIeeLMGeA11dkEdFWciUhQcUrGkcdIViH-uNx9hfCM4c3hGvFu7DzxphqtpgdptFfgeTXRkFLS2wwCHhXHNFklLvUG6GkcHCkzD1eoPPRGrmRmmQFLN87KgQe4kgs8kRdK9RTy0QxWmYobpY7Zoc4BiQRIuinOZHQEMki9J-Vv6bIKyisi_hKOefGmtDzfhs36A-LdHllFV87G6rl9LUzrngtyZhJ_9NX7LiPAvdg1seF2pBSuOslDSgrez-3ZtdJo7BmhP3hNw1mCeuFdu5FYlNPry5k5EaNumU2r302NCiDBgN5Yh42xHe_tntkJepRwecP7i_7iZ1Wtr5APof9ws0andEqUxnq-8poFCZsO7jOgMgHWP0tlp8Q7k-ENyCOdm1LLW-TO5nLIgYfQMfsOXuwMiydvmNIu1lxXv2TZNdg5SDsTm3-_VaFbmdnnE9zSK2jTQcNfZMMCftI1SLa2Tt36bQBivPDK6DzS1AHdIXU_Wxv8OhKGILHizJgq43RGrdWi4WafJmliqgvBrw5Hr2w1PXqxZ9GMUanmpnFk42wlpYSr7cvwZ3MAON1I2nr1a8aFcFQ3nrYA3x0qTXvBZmktnGA7g47i29Gnywe4KXhNP0_92gG87gDYcvR9v6P7qFqKF9QwUPthBDqKWKaRQXyZsBZm3pfEC9SwTZp3_lbaS8Bw_f7TX4-uJuiw61qJS6-aY9qFSVgKU62qMZrkgCimWX2wh3nirtSvRku4AeYYY77bGICA1nPT63XgjKLlLpH7q6WSFAQlWNWfVH4tx3w5sAgPtQmM1xRIL8qWK-CIo1r3BVxZFJMBXVIDUNfU-tZi6kMZesKRwUMsa1g1JTr3hAQ_8w1prrSEtaF9LyfmmPZ2d9A2bNdXsQ3JHoj5ZWxAAb4ofJaCCMZmY1rQl-cUYsXRgypImQRGdyZNFULLoEUGL5aMzbVbabiHDdq9fTfUrvIKhHm5TL8WjCUs_XXKMjA5Jcmi-BqqDWgLQgGpTah_uLlo5m"
+
+  for name in "${!URLS[@]}"; do
+    curl -fL "${URLS[$name]}" -o "${OUT_DIR}/${name}.svg"
+  done
+fi
 
 echo "Rendered SVGs to ${OUT_DIR}"

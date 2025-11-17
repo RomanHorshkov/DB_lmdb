@@ -1,6 +1,6 @@
 # PlantUML Assets
 
-Purpose: provide reusable PlantUML sources rendered by CI into SVGs. Mermaid is avoided entirely.
+Purpose: provide reusable PlantUML sources rendered locally into SVGs (no CI pipeline). Mermaid is avoided entirely.
 
 ## Files
 - `base.puml` — shared style (colors, fonts, sequence/package defaults). Include it for local rendering.
@@ -9,15 +9,20 @@ Purpose: provide reusable PlantUML sources rendered by CI into SVGs. Mermaid is 
 - `dynamic_ops.puml` — operation flow sequence (standalone).
 - `examples/architecture_example.puml` — style demo using the shared base.
 
-## CI pipeline
-- `.github/workflows/plantuml.yml` installs PlantUML/Graphviz, runs `scripts/render_plantuml.sh`, and fails if generated SVGs are out of date.
+## How the Markdown is rendered
 - `docs/architecture/*.md` reference the generated SVGs at `docs/plantuml/generated/*.svg`.
+- The SVGs are versioned; regenerate them manually when `.puml` files change.
 
-## Local rendering (optional)
-1. Install PlantUML and Graphviz.
+## Regenerating SVGs (manual)
+Option A — local PlantUML:
+1. Install PlantUML and Graphviz locally.
 2. Run `./scripts/render_plantuml.sh`.
-3. The SVGs land in `docs/plantuml/generated/`; the Markdown files already point there.
+
+Option B — download from plantuml.com (no local PlantUML needed, requires network):
+1. Run `PLANTUML_USE_SERVER=1 ./scripts/render_plantuml.sh` (default path also downloads if `plantuml` is absent).
+
+All SVGs land in `docs/plantuml/generated/`; the Markdown files already point there.
 
 Tips:
 - Keep diagram sources in `docs/plantuml/` and regenerate as styles change.
-- Use the standalone `.puml` variants when embedding via alternative workflows; the generated SVGs live in `docs/plantuml/generated/`.
+- Generated artifacts belong in `docs/plantuml/generated/` so GitHub can display them directly.

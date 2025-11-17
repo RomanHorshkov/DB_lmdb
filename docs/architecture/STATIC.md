@@ -1,6 +1,6 @@
 # Static Architecture: LMDB Wrapper
 
-This document captures the structural view of the LMDB wrapper around `db_lmdb_*`. Diagrams use PlantUML and are rendered in CI as SVGs (no Mermaid).
+This document captures the structural view of the LMDB wrapper around `db_lmdb_*`. Diagrams use PlantUML and are rendered locally into SVGs (no Mermaid).
 
 ## Scope
 - Public surface: what headers a consumer includes (`db_lmdb.h`, `db.h`, `dbi.h`) and how `db.h` re-exports DBI structures.
