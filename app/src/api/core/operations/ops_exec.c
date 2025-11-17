@@ -7,20 +7,19 @@
  * (c) 2025
  */
 
-#include "db_lmdb_ops.h"      /* db_internal.h -> lmdb.h, stdio, stdlib, string, time */
-#include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
-#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */
-#include "db_lmdb_internal.h" /* interface, config, emlog */
-#include "void_store.h"
+#include "db.h" /* DB, DBI, lmdb */
+#include "operations.h"
 
-#include <lmdb.h>
+#include "security.h" /* security_check */
+#include "common.h"   /* EML_ERROR etc */
 
 /****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
 
-#define LOG_TAG "lmdb_ops"
+#define LOG_TAG "ops_exec"
+#define OPS_CACHE_SIZE 4
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -32,24 +31,12 @@
  * PRIVATE VARIABLES
  ****************************************************************************
  */
-/* None */
+DB_operation_t* ops_cache[OPS_CACHE_SIZE] = { NULL };
 
 /****************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
  ****************************************************************************
  */
-
-/**
- * @brief Query whether an LMDB database supports duplicate keys.
- *
- * Thin wrapper over mdb_dbi_flags() to expose the MDB_DUPSORT property.
- *
- * @param[in]  txn            Active transaction.
- * @param[in]  dbi            Database handle.
- * @param[out] out_is_dupsort 1 if DBI has MDB_DUPSORT, else 0.
- * @return MDB_SUCCESS on success, otherwise LMDB error code.
- */
-static int _dbi_is_dupsort(MDB_txn* txn, MDB_dbi dbi, int* out_is_dupsort);
 
 /**
  * @brief Initialize a key store from a single memory segment.
@@ -154,30 +141,52 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op);
  */
 DB_operation_t* ops_create(size_t n_ops)
 {
+    /* Check input */
+    if (n_ops == 0)
+    {
+        EML_ERROR(LOG_TAG, "ops_create: n_ops cannot be zero");
+        return NULL;
+    }
+
+    /* Try to use cached operations memory */
+    if (n_ops <= OPS_CACHE_SIZE)
+    {
+        /* Clean cache */
+        memset(ops_cache, 0, sizeof(DB_operation_t*) * OPS_CACHE_SIZE);
+        return ops_cache;
+    }
+    
     return (DB_operation_t*)calloc(n_ops, sizeof(DB_operation_t));
 }
 
-int ops_put_one(const dbi_desc_t const* desc, const void const* key, const size_t klen,
+int ops_put_one(const unsigned int dbi, const void const* key, const size_t klen,
                 const void const* val, const size_t vlen)
 {
-    if(!desc || !key || !val || klen == 0 || vlen == 0)
+    if(dbi == 0 || !key || !val || klen == 0 || vlen == 0)
     {
-        EML_ERROR(LOG_TAG, "ops_put_one_desc: invalid input");
+        EML_ERROR(LOG_TAG, "ops_put_one: invalid input");
         return -EINVAL;
     }
 
     MDB_txn* txn          = NULL;
     int      res          = 0;
-    size_t   retry_budget = 2;
+    size_t   retry_budget = 3;
 
 retry:
 {
-    /* Begin transaction */
-    switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &retry_budget, &res))
+    retry_budget--;
+    if(retry_budget < 2)
     {
-        case DB_LMDB_SAFE_OK:
+        LMDB_EML_WARN(LOG_TAG, "ops_put_one: retrying operation, retries left=%zu", retry_budget);
+    }
+    
+    
+    /* Begin transaction */
+    switch(ops_txn_begin(&txn, 0, &res))
+    {
+        case DB_SAFETY_OK:
             break;
-        case DB_LMDB_SAFE_RETRY:
+        case DB_SAFETY_RETRY:
             goto retry;
         default:
             goto fail;
@@ -198,9 +207,9 @@ retry:
         switch(db_lmdb_put_safe(txn, desc->dbi, &k, &v, desc->put_flags, &retry_budget, &mdb_rc,
                                 &mapped_err))
         {
-            case DB_LMDB_SAFE_OK:
+            case DB_SAFETY_OK:
                 break;
-            case DB_LMDB_SAFE_RETRY:
+            case DB_SAFETY_RETRY:
                 goto retry;
             default:
                 res = mapped_err ? mapped_err : db_map_mdb_err(mdb_rc);
@@ -216,9 +225,9 @@ retry:
         switch(db_lmdb_put_safe(txn, desc->dbi, &k, &v, MDB_RESERVE, &retry_budget, &mdb_rc,
                                 &mapped_err))
         {
-            case DB_LMDB_SAFE_OK:
+            case DB_SAFETY_OK:
                 break;
-            case DB_LMDB_SAFE_RETRY:
+            case DB_SAFETY_RETRY:
                 goto retry;
             default:
                 res = mapped_err ? mapped_err : db_map_mdb_err(mdb_rc);
@@ -230,11 +239,11 @@ retry:
     }
 
     /* Commit the transaction */
-    switch(db_lmdb_txn_commit_safe(txn, &retry_budget, &res))
+    switch(ops_txn_commit(txn, &res))
     {
-        case DB_LMDB_SAFE_OK:
+        case DB_SAFETY_OK:
             break;
-        case DB_LMDB_SAFE_RETRY:
+        case DB_SAFETY_RETRY:
             goto retry;
         default:
             goto fail;
@@ -242,6 +251,11 @@ retry:
 }
 
 fail:
+    /* abort transaction here */
+    if(txn)
+    {
+        mdb_txn_abort(txn);
+    }
     return res;
 }
 
@@ -366,16 +380,6 @@ int ops_rep_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t
 int ops_rep_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_size)
 {
     return void_store_add(op->val_store, val_seg, val_seg_size);
-}
-
-int ops_lst_prepare(void)
-{
-    return 0;
-}
-
-int ops_comp_prepare(void)
-{
-    return 0;
 }
 
 int ops_del_prepare(DB_operation_t* op, MDB_dbi dbi, const void* key_seg, size_t key_seg_size,
@@ -581,19 +585,6 @@ void ops_free(DB_operation_t** ops, size_t* n_ops)
  * PRIVATE FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
-static int _dbi_is_dupsort(MDB_txn* txn, MDB_dbi dbi, int* out_is_dupsort)
-{
-    unsigned int flags = 0;
-    int          res   = mdb_dbi_flags(txn, dbi, &flags);
-    if(res != MDB_SUCCESS)
-    {
-        LMDB_LOG_ERR(LOG_TAG, "_dbi_is_dupsort:mdb_dbi_flags", res);
-        return res;
-    }
-    *out_is_dupsort = (flags & MDB_DUPSORT) ? 1 : 0;
-    return 0;
-}
 
 static int _prepare_key(void_store_t** st, void* key_seg, size_t seg_size)
 {

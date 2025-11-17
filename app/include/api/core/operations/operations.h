@@ -27,10 +27,15 @@
 #ifndef DB_OPERATIONS_H
 #define DB_OPERATIONS_H
 
+#include "void_store.h" /* void_store_t */
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+
+
 
 /**
  * @defgroup dbops DB Operation Layer
@@ -55,7 +60,7 @@ typedef enum
 typedef struct
 {
     DB_operation_type_t type;      /**< Operation kind. */
-    MDB_dbi             dbi;       /**< Target DBI handle. */
+    unsigned int         dbi;       /**< Target DBI handle. */
     void_store_t*       key_store; /**< Key bytes store. */
     void_store_t*       val_store; /**< Concatenated value bytes/patch. */
     unsigned            flags;     /**< LMDB flags (e.g., MDB_NOOVERWRITE/MDB_APPEND). */
@@ -63,6 +68,7 @@ typedef struct
     void*  dst;                    /**< Result buffer for GET (owned by op). */
     size_t dst_len;                /**< Result length for GET. */
 } DB_operation_t;
+
 
 /**
  * @brief Allocate a zero-initialized array of operations.

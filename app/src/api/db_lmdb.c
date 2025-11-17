@@ -29,16 +29,13 @@
  ****************************************************************************
  */
 
-/* Global DB handle */
-struct DB* DB = NULL;
-
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_dir)
 {
-    if(DB)
+    if(DataBase)
     {
         EML_ERROR(LOG_TAG, "_db_init: database already initialized");
         return -EALREADY;
@@ -72,7 +69,7 @@ int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_di
     /* Set map size values */
     new_db->map_size_bytes     = DB_MAP_SIZE_INIT;
     new_db->map_size_bytes_max = DB_MAP_SIZE_MAX;
-    DB                         = new_db; /* expose for db_lmdb_dbi_init */
+    DataBase                   = new_db; /* expose for db_lmdb_dbi_init */
 
     /* Initialize sub-dbis */
     res = db_lmdb_dbi_init(dbi_decls, n_dbis);
@@ -89,7 +86,7 @@ int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_di
     return 0;
 
 fail:
-    DB = NULL;
+    DataBase = NULL;
     EML_PERR(LOG_TAG, "_db_init: failed with err %d", res);
     if(new_db)
     {
@@ -102,13 +99,13 @@ fail:
 
 int db_lmdb_metrics(uint64_t* used, uint64_t* mapsize, uint32_t* psize)
 {
-    if(!DB || !DB->env) return -EINVAL;
+    if(!DataBase || !DataBase->env) return -EINVAL;
     MDB_envinfo info;
     MDB_stat    st;
     int         rc;
-    rc = mdb_env_info(DB->env, &info);
+    rc = mdb_env_info(DataBase->env, &info);
     if(rc != MDB_SUCCESS) return -EIO;
-    rc = mdb_env_stat(DB->env, &st);
+    rc = mdb_env_stat(DataBase->env, &st);
     if(rc != MDB_SUCCESS) return -EIO;
     if(mapsize) *mapsize = (uint64_t)info.me_mapsize;
     if(psize) *psize = (uint32_t)st.ms_psize;
@@ -118,66 +115,17 @@ int db_lmdb_metrics(uint64_t* used, uint64_t* mapsize, uint32_t* psize)
 
 void db_lmdb_close(void)
 {
-    if(!DB) return;
+    if(!DataBase) return;
 
-    if(DB->env) mdb_env_close(DB->env);
+    if(DataBase->env) mdb_env_close(DataBase->env);
 
-    if(DB->dbis) free(DB->dbis);
+    if(DataBase->dbis) free(DataBase->dbis);
 
-    free(DB);
-    DB = NULL;
+    free(DataBase);
+    DataBase = NULL;
 }
 
 /****************************************************************************
  * PRIVATE FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
-int db_map_mdb_err(int rc)
-{
-    if(rc == MDB_SUCCESS) return 0;
-
-    switch(rc)
-    {
-        case MDB_NOTFOUND:
-            return -ENOENT;    /* absent key/EOF */
-        case MDB_KEYEXIST:
-            return -EEXIST;    /* unique constraint */
-        case MDB_MAP_FULL:
-            return -ENOSPC;    /* env mapsize reached */
-        case MDB_DBS_FULL:
-            return -ENOSPC;    /* max named DBs */
-        case MDB_READERS_FULL:
-            return -EAGAIN;    /* too many readers */
-        case MDB_TXN_FULL:
-            return -EOVERFLOW; /* too many dirty pages */
-        case MDB_CURSOR_FULL:
-            return -EOVERFLOW; /* internal stack too deep */
-        case MDB_PAGE_FULL:
-            return -ENOSPC;    /* internal page space */
-        case MDB_MAP_RESIZED:
-            return -EAGAIN;    /* retry after resize */
-        case MDB_INCOMPATIBLE:
-            return -EPROTO;    /* flags/type mismatch */
-        case MDB_VERSION_MISMATCH:
-            return -EINVAL;    /* library/env mismatch */
-        case MDB_INVALID:
-            return -EINVAL;    /* not an LMDB file */
-        case MDB_PAGE_NOTFOUND:
-            return -EIO;       /* likely corruption */
-        case MDB_CORRUPTED:
-            return -EIO;       /* detected corruption */
-        case MDB_PANIC:
-            return -EIO;       /* fatal env error */
-        case MDB_BAD_RSLOT:
-            return -EBUSY;     /* reader slot misuse */
-        case MDB_BAD_TXN:
-            return -EINVAL;    /* invalid/child txn */
-        case MDB_BAD_VALSIZE:
-            return -EINVAL;    /* key/data size wrong */
-        case MDB_BAD_DBI:
-            return -ESTALE;    /* DBI changed/dropped */
-        default:
-            return -rc;        /* unknown error, let pass the code */
-    }
-}

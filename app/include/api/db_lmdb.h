@@ -24,30 +24,10 @@ extern "C"
 {
 #endif
 
-/**
- * @brief Types of LMDB named databases.
- */
-typedef enum
-{
-    DBI_TYPE_DEFAULT  = 0,     /* no special flags */
-    DBI_TYPE_DUPSORT  = 1,     /* sorted duplicate keys */
-    DBI_TYPE_DUPFIXED = 1 << 1 /* fixed-size duplicate keys */
-} dbi_type_t;
-
-/**
- * @brief Declaration for a named LMDB database (non-owning strings).
- *
- * Intended for transient arrays passed to db_lmdb_init/db_lmdb_dbi_init.
- */
-typedef struct
-{
-    const char* name;
-    dbi_type_t  type;
-} dbi_decl_t;
-
 /****************************************************************************
  * PUBLIC DEFINES
- ****************************************************************************/
+ ****************************************************************************
+*/
 
 /**
  * @brief Initialize the LMDB environment and open the requested DBIs.
@@ -75,7 +55,7 @@ typedef struct
  *         or EACCES for filesystem-related errors, or other errno codes
  *         propagated from LMDB initialization.
  */
-int db_lmdb_init(const dbi_decl_t* dbis, size_t n_dbis, const char* meta_dir);
+int db_lmdb_init(const dbi_decl_t* dbis, uint8_t n_dbis, const char* meta_dir);
 
 /**
  * @brief Retrieve basic LMDB environment metrics.

@@ -7,6 +7,7 @@
         "db_lmdb_dbi.h": "c",
         "void_store.h": "c",
         "db_lmdb_ops.h": "c",
-        "db_lmdb_config.h": "c"
+        "db_lmdb_config.h": "c",
+        "lmdb.h": "c"
     }
 }

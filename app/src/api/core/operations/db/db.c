@@ -9,10 +9,6 @@
  * (c) 2025
  */
 
-#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */
-#include "db_lmdb_core.h"
-#include "db_lmdb_internal.h" /* interface, config, emlog */
-
 /****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
@@ -24,13 +20,26 @@
  * PRIVATE STUCTURED VARIABLES
  ****************************************************************************
  */
-/* None */
+
+/**
+ * @brief Main LMDB database structure.
+ */
+typedef struct
+{
+    MDB_env*    env;                /* LMDB environment */
+    dbi_desc_t* dbis;               /* array of DBI descriptors */
+    uint8_t     n_dbis;             /* number of DBIs in array */
+    size_t      map_size_bytes;     /* current map size */
+    size_t      map_size_bytes_max; /* maximum map size */
+} DataBase;
 
 /************************************************************************
  * PRIVATE VARIABLES
  ****************************************************************************
  */
-/* None */
+
+/* Global DB handle */
+DataBase_t* DataBase = NULL;
 
 /************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
@@ -84,7 +93,7 @@ static inline int _DB_is_ok()
  * @param open_retry_budget     Retry budget for opening DBIs.
  * @param flags_retry_budget    Retry budget for fetching DBI flags.
  * @param out_err               Optional mapped errno on failure.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
                          dbi_desc_t* out, size_t* open_retry_budget, size_t* flags_retry_budget,
@@ -135,9 +144,9 @@ retry:
     /* Begin transaction */
     switch(db_lmdb_txn_begin_safe(DB->env, 0, &txn, &txn_retry_budget, &res))
     {
-        case DB_LMDB_SAFE_OK:
+        case DB_SAFETY_OK:
             break;
-        case DB_LMDB_SAFE_RETRY:
+        case DB_SAFETY_RETRY:
             goto retry;
         default:
             goto fail;
@@ -151,9 +160,9 @@ retry:
 
         switch(act)
         {
-            case DB_LMDB_SAFE_OK:
+            case DB_SAFETY_OK:
                 continue;
-            case DB_LMDB_SAFE_RETRY:
+            case DB_SAFETY_RETRY:
                 EML_WARN(LOG_TAG, "_dbi_init: retrying at dbi %zu", opened_dbi_idx);
                 goto retry;
             default:
@@ -164,9 +173,9 @@ retry:
 
     switch(db_lmdb_txn_commit_safe(txn, &txn_retry_budget, &res))
     {
-        case DB_LMDB_SAFE_OK:
+        case DB_SAFETY_OK:
             break;
-        case DB_LMDB_SAFE_RETRY:
+        case DB_SAFETY_RETRY:
             EML_WARN(LOG_TAG, "db_lmdb_dbi_init: retrying txn commit");
             goto retry;
         default:
@@ -197,7 +206,7 @@ static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flag
     {
         if(out_err) *out_err = -EINVAL;
         EML_ERROR(LOG_TAG, "_dbi_init_one: invalid input");
-        return DB_LMDB_SAFE_FAIL;
+        return DB_SAFETY_FAIL;
     }
 
     MDB_dbi  dbi        = 0;
@@ -206,17 +215,17 @@ static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flag
 
     int act = db_lmdb_dbi_open_safe(txn, decl->name, open_flags, &dbi, open_retry_budget, &mdb_rc,
                                     out_err);
-    if(act != DB_LMDB_SAFE_OK)
+    if(act != DB_SAFETY_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_open", mdb_rc);
+        LMDB_EML_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_open", mdb_rc);
         return act;
     }
 
     unsigned db_flags = 0;
     act = db_lmdb_dbi_get_flags_safe(txn, dbi, &db_flags, flags_retry_budget, &mdb_rc, out_err);
-    if(act != DB_LMDB_SAFE_OK)
+    if(act != DB_SAFETY_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_flags", mdb_rc);
+        LMDB_EML_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_flags", mdb_rc);
         return act;
     }
 
@@ -231,5 +240,5 @@ static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flag
                                ? dbi_desc_default_put_flags(db_flags)
                                : put_flags_default;
 
-    return DB_LMDB_SAFE_OK;
+    return DB_SAFETY_OK;
 }

@@ -13,13 +13,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum db_lmdb_safety_ret_code
-{
-    DB_LMDB_SAFE_OK = 0, /* proceed */
-    DB_LMDB_SAFE_RETRY,  /* retry the operation after cleanup */
-    DB_LMDB_SAFE_FAIL    /* fail with mapped errno */
-};
-
 #define DB_LMDB_RETRY_TRANSACTION 2
 #define DB_LMDB_RETRY_DBI_OPEN    3
 #define DB_LMDB_RETRY_DBI_FLAGS   3
@@ -44,7 +37,7 @@ int db_lmdb_create_env_safe(struct DB* DataBase, const char* path, unsigned int 
  * @param out_txn    Filled with started transaction on success.
  * @param retry_budget Optional retry counter (decremented on retry). May be NULL.
  * @param out_err    Optional mapped errno on FAIL.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size_t* retry_budget,
                            int* out_err);
@@ -55,7 +48,7 @@ int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size
  * @param txn          LMDB transaction to commit.
  * @param retry_budget Optional retry counter (decremented on retry). May be NULL.
  * @param out_err      Optional mapped errno on FAIL.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err);
 
@@ -69,7 +62,7 @@ int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err);
  * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
  * @param out_mdb_rc    Optional raw LMDB rc for logging.
  * @param out_err       Optional mapped errno on FAIL/RETRY.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 int db_lmdb_dbi_open_safe(MDB_txn* txn, const char* name, unsigned int open_flags, MDB_dbi* out_dbi,
                           size_t* retry_budget, int* out_mdb_rc, int* out_err);
@@ -83,7 +76,7 @@ int db_lmdb_dbi_open_safe(MDB_txn* txn, const char* name, unsigned int open_flag
  * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
  * @param out_mdb_rc    Optional raw LMDB rc for logging.
  * @param out_err       Optional mapped errno on FAIL/RETRY.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 int db_lmdb_dbi_get_flags_safe(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags,
                                size_t* retry_budget, int* out_mdb_rc, int* out_err);
@@ -99,7 +92,7 @@ int db_lmdb_dbi_get_flags_safe(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flag
  * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
  * @param out_mdb_rc    Optional raw LMDB rc for logging.
  * @param out_err       Optional mapped errno on FAIL/RETRY.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ * @return DB_SAFETY_OK/RETRY/FAIL
  */
 int db_lmdb_put_safe(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data, unsigned int flags,
                      size_t* retry_budget, int* out_mdb_rc, int* out_err);
@@ -114,7 +107,7 @@ int db_lmdb_put_safe(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data, uns
  * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
  * @param out_mdb_rc    Optional raw LMDB rc for logging.
  * @param out_err       Optional mapped errno on FAIL/RETRY.
- * @return DB_LMDB_SAFE_OK/RETRY/FAIL (MDB_NOTFOUND maps to FAIL)
+ * @return DB_SAFETY_OK/RETRY/FAIL (MDB_NOTFOUND maps to FAIL)
  */
 int db_lmdb_get_safe(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data, size_t* retry_budget,
                      int* out_mdb_rc, int* out_err);
