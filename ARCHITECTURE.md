@@ -4,22 +4,15 @@ This document summarizes the LMDB wrapper around `db_lmdb_*` in terms of compone
 
 ## Static Architecture
 
-- **Public API (`app/include/db_lmdb/db_lmdb.h`, `app/src/db_lmdb/db_lmdb.c`)**: Low-ceremony entry points to initialize/close the LMDB environment and fetch metrics. Exposes the `dbi_decl_t` declaration type; hides LMDB internals.
-- **Core safety & environment (`app/include/db_lmdb/db_lmdb_core.h`, `app/src/core/db_lmdb_core.c`)**: Centralizes LMDB retry/resize policy for env create/open, txn begin/commit, DBI open/flag fetch, and CRUD calls. Maps LMDB return codes to errno-style outcomes.
-- **DBI management (`app/include/db_lmdb/db_lmdb_dbi.h`, `app/src/core/db_lmdb_dbi.c`)**: Opens declared named databases inside a bootstrap transaction, caches descriptors (`dbi_desc_t`) with handles/flags/default put flags, and stores them on the global `DB`.
-- **Shared state (`app/include/db_lmdb/db_lmdb_internal.h`)**: Defines `struct DB` (env handle, DBI descriptor array, map size tracking) and exports the `DB` singleton used by internal layers. Also holds logging helpers and config constants.
-- **Operations layer (`app/include/db_lmdb/db_lmdb_ops.h`, `app/src/ops/db_lmdb_ops.c`)**: Transaction-friendly operations (`PUT/GET/REP/DEL` plus batching via `ops_exec`). Depends on cached DBI descriptors and uses core safety helpers for retries/map growth. This is the only layer that touches `void_store`.
-- **Byte-store utility (`app/include/db_lmdb/void_store.h`, `app/src/ops/void_store.c`)**: Small segmented buffer builder used by operations to assemble keys/values or patches without extra copies.
-- **External dependencies**: LMDB (storage engine) and `emlog` (logging).
+### Packages overview
 
 ```mermaid
 %% Column view with logging visible
-flowchart TB
+flowchart LR
     subgraph App [DB app packages]
         api[API]
         core[CORE]
         ops[OPS]
-        vs[void_store]
     end
 
     subgraph DB_specific [DB specific]
@@ -27,22 +20,24 @@ flowchart TB
         dbi[DBI]
     end
 
-    subgraph Internals [internals]
-        internal[db_lmdb_internal.h / DB struct + config]
+    subgraph Internals [Internals]
+        config[db_lmdb_config]
         lmdb[(LMDB)]
     end
 
-    subgraph Col4 [EMlog]
+    subgraph Col4 [Externals]
         emlog[EMlog]
     end
 
-    api --> core --> ops --> vs
-    DB_specific --> internal
-    App --> DB_specific
+    api --> core --> ops
+    DB_specific --> Internals
+    core --> DB_specific
+    ops --> DB_specific
 
-    internal --> lmdb
-    internal -.-> emlog
+    Internals -.-> emlog
 ```
+
+### DB app packages
 
 ```mermaid
 %% Core-only wiring (no externals shown)
