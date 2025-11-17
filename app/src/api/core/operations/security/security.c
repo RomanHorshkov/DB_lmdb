@@ -1,10 +1,15 @@
-
+/**
+ * @file security.c
+ * @brief Centralized LMDB return-code policy and retry/resize guidance.
+ */
 
 #include "security.h"
-#include "common.h"
-#include <errno.h>
 
-#include <lmdb.h>
+#include <errno.h>
+// #include <lmdb.h>   /* ret codes */
+
+#include "db.h"         /* DB, DataBase, common, stddef, stdintm  */
+
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -54,7 +59,7 @@ db_security_ret_code_t security_check(const int mdb_rc, int* const out_errno)
 {
     /* Fast path */
     if(mdb_rc == MDB_SUCCESS) return DB_SAFETY_OK;
-    
+
     /* Map error if requested */
     if(out_errno) *out_errno = _map_mdb_err_to_errno(mdb_rc);
 
@@ -70,17 +75,15 @@ db_security_ret_code_t security_check(const int mdb_rc, int* const out_errno)
         case MDB_READERS_FULL:
             return DB_SAFETY_RETRY;
         case MDB_MAP_FULL: /* Need memory expansion */
-            if(db_env_mapsize_expand() == 0)
-                return DB_SAFETY_RETRY;
+            if(db_env_mapsize_expand() == 0) return DB_SAFETY_RETRY;
             EML_ERROR(LOG_TAG, "security_check: mapsize_expand failed");
             return DB_SAFETY_FAIL;
-        
+
         /* Failure Cases */
         case MDB_NOTFOUND:
         case MDB_KEYEXIST:
         default:
             return DB_SAFETY_FAIL;
-
     }
 }
 
@@ -136,4 +139,18 @@ int _map_mdb_err_to_errno(int rc)
         default:
             return -rc;        /* unknown error, let pass the code */
     }
+}
+
+
+int db_env_mapsize_expand(void)
+{
+    if(!(DB && DB->env)) return -EIO;
+    uint64_t desired = DB->map_size_bytes * 2;
+    if(desired > DB->map_size_bytes_max)
+    {
+        EML_WARN(LOG_TAG, "db_env_mapsize_expand: desired size %zu exceeds max %zu",
+                 (size_t)desired, DB->map_size_bytes_max);
+        return -ENOSPC;
+    }
+    return mdb_env_set_mapsize(DB->env, desired);
 }

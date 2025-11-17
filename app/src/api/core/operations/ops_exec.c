@@ -7,18 +7,18 @@
  * (c) 2025
  */
 
-#include "db.h" /* DB, DBI, lmdb */
+#include "db.h"       /* DB, DBI, lmdb */
 #include "operations.h"
 
+#include "common.h"   /* EMlog, config */
 #include "security.h" /* security_check */
-#include "common.h"   /* EML_ERROR etc */
 
 /****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
 
-#define LOG_TAG "ops_exec"
+#define LOG_TAG        "ops_exec"
 #define OPS_CACHE_SIZE 4
 
 /****************************************************************************
@@ -31,7 +31,7 @@
  * PRIVATE VARIABLES
  ****************************************************************************
  */
-DB_operation_t* ops_cache[OPS_CACHE_SIZE] = { NULL };
+DB_operation_t* ops_cache[OPS_CACHE_SIZE] = {NULL};
 
 /****************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
@@ -139,23 +139,24 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op);
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
+
 DB_operation_t* ops_create(size_t n_ops)
 {
     /* Check input */
-    if (n_ops == 0)
+    if(n_ops == 0)
     {
         EML_ERROR(LOG_TAG, "ops_create: n_ops cannot be zero");
         return NULL;
     }
 
     /* Try to use cached operations memory */
-    if (n_ops <= OPS_CACHE_SIZE)
+    if(n_ops <= OPS_CACHE_SIZE)
     {
         /* Clean cache */
         memset(ops_cache, 0, sizeof(DB_operation_t*) * OPS_CACHE_SIZE);
         return ops_cache;
     }
-    
+
     return (DB_operation_t*)calloc(n_ops, sizeof(DB_operation_t));
 }
 
@@ -179,8 +180,7 @@ retry:
     {
         LMDB_EML_WARN(LOG_TAG, "ops_put_one: retrying operation, retries left=%zu", retry_budget);
     }
-    
-    
+
     /* Begin transaction */
     switch(ops_txn_begin(&txn, 0, &res))
     {

@@ -2,9 +2,9 @@
 
 #include "common.h"     /* EMlog, config */
 
-#include "security.h" /* security_check */
 #include "db.h"         /* DB, DBI, lmdb */
 #include "operations.h" /* DB_operation_t etc */
+#include "security.h"   /* security_check */
 
 #include <lmdb.h>
 
@@ -14,7 +14,6 @@
  */
 
 #define LOG_TAG "ops_cre"
-
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -32,14 +31,16 @@
  * PRIVATE FUNCTIONS PROTOTYPES
  ****************************************************************************
  */
-/* None */
 
-/****************************************************************************
- * PUBLIC FUNCTIONS DEFINITIONS
- ****************************************************************************
- */
+db_security_ret_code_t _db_create_env(int* const out_err);
 
+db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const out_err);
 
+db_security_ret_code_t _db_set_map_size(const size_t db_map_size, int* const out_err);
+
+// @param[in] mode The UNIX permissions to set on created files and semaphores.
+db_security_ret_code_t _db_open_env(const char* const path, const unsigned int mode,
+                                       int* const out_err);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
@@ -62,7 +63,7 @@ db_security_ret_code_t ops_txn_begin(MDB_txn** out_txn, const unsigned flags, in
     security_check on hot path */
     if(mdb_res != 0)
     {
-         return security_check(mdb_res, out_err);
+        return security_check(mdb_res, out_err);
     }
 
     return DB_SAFETY_OK;
@@ -88,9 +89,60 @@ db_security_ret_code_t ops_txn_commit(MDB_txn* const txn, int* const out_err)
 }
 
 
-db_security_ret_code_t ops_db_create_env(int* const out_err)
+db_security_ret_code_t ops_exec_create_env(const unsigned int max_dbis, const size_t db_map_size, const char* const path,
+                    const unsigned int mode, int* const out_err)
 {
-    int res = -1;
+    /* Create environment */
+    switch(_db_create_env(out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_create_env failed");
+            return DB_SAFETY_FAIL;
+    }
+
+    /* Set max DBIs */
+    switch(_db_set_max_dbis(max_dbis, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_set_max_dbis failed");
+            return DB_SAFETY_FAIL;
+    }
+
+    /* Set map size */
+    switch(_db_set_map_size(db_map_size, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_set_map_size failed");
+            return DB_SAFETY_FAIL;
+    }
+    
+    /* Open environment */
+    switch(_db_open_env(path, mode, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_open_env failed");
+            return DB_SAFETY_FAIL;
+    }
+
+    return DB_SAFETY_OK;
+}
+
+
+/****************************************************************************
+ * PRIVATE FUNCTIONS DEFINITIONS
+ ****************************************************************************
+ */
+
+db_security_ret_code_t _db_create_env(int* const out_err)
+{
     /* Create environment */
     int mdb_res = mdb_env_create(&DataBase->env);
     if(mdb_res != 0) goto fail;
@@ -106,10 +158,10 @@ fail:
     return security_check(mdb_res, out_err);
 }
 
-db_security_ret_code_t ops_db_set_max_dbis(const unsigned int max_dbis, int* const out_err)
+db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const out_err)
 {
     /* Check input */
-    if(max_dbis == 0) 
+    if(max_dbis == 0)
     {
         EML_ERROR(LOG_TAG, "_set_max_dbis: max_dbis cannot be zero");
         return -EINVAL;
@@ -125,10 +177,10 @@ fail:
     return security_check(mdb_res, out_err);
 }
 
-db_security_ret_code_t ops_db_set_map_size(const size_t db_map_size, int* const out_err)
+db_security_ret_code_t _db_set_map_size(const size_t db_map_size, int* const out_err)
 {
     /* Check input */
-    if(db_map_size == 0) 
+    if(db_map_size == 0)
     {
         EML_ERROR(LOG_TAG, "_set_map_size: db_map_size cannot be zero");
         return -EINVAL;
@@ -145,7 +197,7 @@ fail:
 }
 
 // @param[in] mode The UNIX permissions to set on created files and semaphores.
-db_security_ret_code_t ops_db_open_env(const char* const path, const unsigned int mode,
+db_security_ret_code_t _db_open_env(const char* const path, const unsigned int mode,
                                        int* const out_err)
 {
     /* Open environment */
