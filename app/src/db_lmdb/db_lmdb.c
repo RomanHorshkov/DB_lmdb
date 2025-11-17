@@ -2,8 +2,9 @@
  * @file db_lmdb.c
  */
 
-#include "db_lmdb_internal.h" /* interface, config, emlog */
 #include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
+#include "db_lmdb_dbi.h"      /* db_lmdb_dbi_* */
+#include "db_lmdb_internal.h" /* interface, config, emlog */
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -56,7 +57,7 @@ int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_di
     }
 
     /* Create LMDB environment (no retry) */
-    res = db_lmdb_core_create_env_safe(new_db, meta_dir, DB_MAX_DBIS, DB_MAP_SIZE_INIT);
+    res = db_lmdb_create_env_safe(new_db, meta_dir, DB_MAX_DBIS, DB_MAP_SIZE_INIT);
     if(res != 0)
     {
         EML_ERROR(LOG_TAG, "_db_init: db_lmdb_create_env_safe failed %d", res);
@@ -67,7 +68,9 @@ int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_di
     new_db->map_size_bytes     = DB_MAP_SIZE_INIT;
     new_db->map_size_bytes_max = DB_MAP_SIZE_MAX;
     DB                         = new_db; /* expose for db_lmdb_dbi_init */
-    res                        = db_lmdb_dbi_init(dbi_decls, n_dbis);
+
+    /* Initialize sub-dbis */
+    res = db_lmdb_dbi_init(dbi_decls, n_dbis);
     if(res != 0)
     {
         EML_ERROR(LOG_TAG, "_db_init: failed to open dbis %d", res);

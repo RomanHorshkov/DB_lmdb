@@ -7,8 +7,8 @@
  * (c) 2025
  */
 
-#ifndef DB_INTERNAL_H
-#define DB_INTERNAL_H
+#ifndef DB_LMDB_INTERNAL_H
+#define DB_LMDB_INTERNAL_H
 
 #include "db_lmdb.h"        /* interface dbi_decl_t */
 #include "db_lmdb_config.h" /* config file */
@@ -110,4 +110,4 @@ int db_env_mapsize_expand(void);
 }
 #endif
 
-#endif /* DB_INTERNAL_H */
+#endif /* DB_LMDB_INTERNAL_H */

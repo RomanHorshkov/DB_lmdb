@@ -8,8 +8,8 @@
  */
 
 #include "db_lmdb_ops.h"      /* db_internal.h -> lmdb.h, stdio, stdlib, string, time */
-#include "db_lmdb_internal.h" /* lmdb.h, stdio, stdlib, string, time */
-#include "db_lmdb_safety.h"
+#include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
+#include "db_lmdb_internal.h" /* interface, config, emlog */
 #include "void_store.h"
 
 /****************************************************************************

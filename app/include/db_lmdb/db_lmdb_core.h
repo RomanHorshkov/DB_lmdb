@@ -10,6 +10,7 @@
 #define DB_LMDB_CORE_H
 
 #include <lmdb.h>
+#include <stdint.h>
 
 enum db_lmdb_safety_ret_code
 {
@@ -17,6 +18,9 @@ enum db_lmdb_safety_ret_code
     DB_LMDB_SAFE_RETRY,  /* retry the operation after cleanup */
     DB_LMDB_SAFE_FAIL    /* fail with mapped errno */
 };
+
+#define DB_LMDB_RETRY_DBI_OPEN  3
+#define DB_LMDB_RETRY_DBI_FLAGS 3
 
 /**
  * @brief Create an LMDB environment using safety policy (no retry here).
@@ -27,8 +31,8 @@ enum db_lmdb_safety_ret_code
  * @param db_map_size Initial map size.
  * @return 0 on success, errno-style code on failure.
  */
-int db_lmdb_core_create_env_safe(struct DB* DataBase, const char* path, unsigned int max_dbis,
-                                 size_t db_map_size);
+int db_lmdb_create_env_safe(struct DB* DataBase, const char* path, unsigned int max_dbis,
+                            size_t db_map_size);
 
 /**
  * @brief Begin a transaction using safety policy (resize+retry baked in).
@@ -50,5 +54,34 @@ int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, int*
  * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
 int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err);
+
+/**
+ * @brief Open a named DBI using the safety policy (resize+retry guidance).
+ * 
+ * @param txn           Active LMDB transaction (write).
+ * @param name          DBI name.
+ * @param open_flags    Flags passed to mdb_dbi_open.
+ * @param out_dbi       Filled with DBI handle on success.
+ * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
+ * @param out_mdb_rc    Optional raw LMDB rc for logging.
+ * @param out_err       Optional mapped errno on FAIL/RETRY.
+ * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ */
+int db_lmdb_dbi_open_safe(MDB_txn* txn, const char* name, unsigned int open_flags, MDB_dbi* out_dbi,
+                          uint8_t* retry_budget, int* out_mdb_rc, int* out_err);
+
+/**
+ * @brief Fetch DBI flags using the safety policy (resize+retry guidance).
+ * 
+ * @param txn           Active LMDB transaction.
+ * @param dbi           DBI handle.
+ * @param out_flags     Filled with DBI flags on success.
+ * @param retry_budget  Optional retry counter (decremented on retry). May be NULL.
+ * @param out_mdb_rc    Optional raw LMDB rc for logging.
+ * @param out_err       Optional mapped errno on FAIL/RETRY.
+ * @return DB_LMDB_SAFE_OK/RETRY/FAIL
+ */
+int db_lmdb_dbi_get_flags_safe(MDB_txn* txn, MDB_dbi dbi, unsigned int* out_flags,
+                               uint8_t* retry_budget, int* out_mdb_rc, int* out_err);
 
 #endif /* DB_LMDB_CORE_H */

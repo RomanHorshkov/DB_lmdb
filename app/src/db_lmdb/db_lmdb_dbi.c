@@ -6,7 +6,7 @@
 #include "db_lmdb_core.h"
 #include "db_lmdb_internal.h" /* interface, config, emlog */
 
- /****************************************************************************
+/****************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
@@ -39,7 +39,7 @@
  * @param type Logical DB type from `dbi_type_t`.
  * @return A bitmask of MDB_* flags appropriate for `mdb_dbi_open`.
  */
-static inline unsigned dbi_desc_open_flags(dbi_type_t type)
+static inline unsigned _dbi_open_flags(dbi_type_t type)
 {
     unsigned flags = MDB_CREATE;
     if(type & DBI_TYPE_DUPSORT) flags |= MDB_DUPSORT;
@@ -74,11 +74,14 @@ static inline int _DB_is_ok()
  * @param decl                  Declaration to initialize from.
  * @param put_flags_default     Default put flags (or DBI_PUT_FLAGS_AUTO).
  * @param out                   Filled with initialized descriptor on success.
- * @return 0 on success, negative errno on failure.
+ * @param open_retry_budget     Retry budget for opening DBIs.
+ * @param flags_retry_budget    Retry budget for fetching DBI flags.
+ * @param out_err               Optional mapped errno on failure.
+ * @return DB_LMDB_SAFE_OK/RETRY/FAIL
  */
-static int _dbi_desc_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
-                             dbi_desc_t* out);
-
+static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
+                         dbi_desc_t* out, uint8_t* open_retry_budget, uint8_t* flags_retry_budget,
+                         int* out_err);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
@@ -95,13 +98,13 @@ int db_lmdb_dbi_init(const dbi_decl_t* dbis, const size_t n_dbis)
         goto fail;
     }
 
-    if (n_dbis == 0 || n_dbis > DB_MAX_DBIS)
+    if(n_dbis == 0 || n_dbis > DB_MAX_DBIS)
     {
         EML_ERROR(LOG_TAG, "_dbi_init: invalid n_dbis=%zu", n_dbis);
         res = -EINVAL;
         goto fail;
     }
-    
+
     /* Set number of sub-dbis */
     DB->n_dbis = (unsigned int)n_dbis;
 
@@ -112,6 +115,9 @@ int db_lmdb_dbi_init(const dbi_decl_t* dbis, const size_t n_dbis)
         res = -ENOMEM;
         goto fail;
     }
+
+    uint8_t open_retry_budget  = DB_LMDB_RETRY_DBI_OPEN;
+    uint8_t flags_retry_budget = DB_LMDB_RETRY_DBI_FLAGS;
 
     MDB_txn* txn = NULL;
 retry:
@@ -129,12 +135,18 @@ retry:
 
     for(size_t i = 0; i < n_dbis; ++i)
     {
-        res = _dbi_desc_init_one(txn, &dbis[i], DBI_PUT_FLAGS_AUTO, &DB->dbis[i]);
-        if(res != 0)
+        int mapped_err = 0;
+        int act = _dbi_init_one(txn, &dbis[i], DBI_PUT_FLAGS_AUTO, &DB->dbis[i], &open_retry_budget,
+                                &flags_retry_budget, &mapped_err);
+        if(act == DB_LMDB_SAFE_OK) continue;
+
+        res = mapped_err ? mapped_err : -EIO;
+        if(act == DB_LMDB_SAFE_RETRY)
         {
-            LMDB_LOG_ERR(LOG_TAG, "db_lmdb_dbi_init:desc_init failed", res);
-            goto fail;
+            goto retry;
         }
+        LMDB_LOG_ERR(LOG_TAG, "db_lmdb_dbi_init:desc_init failed", res);
+        goto fail;
     }
 
     res = mdb_txn_commit(txn);
@@ -158,26 +170,36 @@ fail:
  ****************************************************************************
  */
 
-static int _dbi_desc_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
-                             dbi_desc_t* out)
+static int _dbi_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put_flags_default,
+                         dbi_desc_t* out, uint8_t* open_retry_budget, uint8_t* flags_retry_budget,
+                         int* out_err)
 {
-    if(!txn || !decl || !decl->name || !out) return -EINVAL;
+    if(out_err) *out_err = 0;
+    if(!txn || !decl || !decl->name || !out)
+    {
+        if(out_err) *out_err = -EINVAL;
+        EML_ERROR(LOG_TAG, "_dbi_init_one: invalid input");
+        return DB_LMDB_SAFE_FAIL;
+    }
 
     MDB_dbi  dbi        = 0;
-    unsigned open_flags = dbi_desc_open_flags(decl->type);
-    int      rc         = mdb_dbi_open(txn, decl->name, open_flags, &dbi);
-    if(rc != MDB_SUCCESS)
+    unsigned open_flags = _dbi_open_flags(decl->type);
+    int      mdb_rc     = MDB_SUCCESS;
+
+    int act = db_lmdb_dbi_open_safe(txn, decl->name, open_flags, &dbi, open_retry_budget, &mdb_rc,
+                                    out_err);
+    if(act != DB_LMDB_SAFE_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "_dbi_desc_init_one:mdb_dbi_open", rc);
-        return db_map_mdb_err(rc);
+        LMDB_LOG_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_open", mdb_rc);
+        return act;
     }
 
     unsigned db_flags = 0;
-    rc                = mdb_dbi_flags(txn, dbi, &db_flags);
-    if(rc != MDB_SUCCESS)
+    act = db_lmdb_dbi_get_flags_safe(txn, dbi, &db_flags, flags_retry_budget, &mdb_rc, out_err);
+    if(act != DB_LMDB_SAFE_OK)
     {
-        LMDB_LOG_ERR(LOG_TAG, "_dbi_desc_init_one:mdb_dbi_flags", rc);
-        return db_map_mdb_err(rc);
+        LMDB_LOG_ERR(LOG_TAG, "_dbi_init_one:mdb_dbi_flags", mdb_rc);
+        return act;
     }
 
     out->dbi               = dbi;
@@ -191,5 +213,5 @@ static int _dbi_desc_init_one(MDB_txn* txn, const dbi_decl_t* decl, unsigned put
                                ? dbi_desc_default_put_flags(db_flags)
                                : put_flags_default;
 
-    return 0;
+    return DB_LMDB_SAFE_OK;
 }

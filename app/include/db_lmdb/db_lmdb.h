@@ -14,8 +14,8 @@
 #ifndef DB_LMDB_H
 #define DB_LMDB_H
 
-#include <stddef.h>      /* size_t */
-#include <stdint.h>      /* uintxx_t */
+#include <stddef.h> /* size_t */
+#include <stdint.h> /* uintxx_t */
 
 // #include "db_lmdb_dbi.h" /* dbi_decl_t */
 
@@ -44,7 +44,6 @@ typedef struct
     const char* name;
     dbi_type_t  type;
 } dbi_decl_t;
-
 
 /****************************************************************************
  * PUBLIC DEFINES
