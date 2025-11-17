@@ -7,11 +7,12 @@
  * (c) 2025
  */
 
-#include "db.h"       /* DB, DBI, lmdb */
-#include "operations.h"
+#include "ops_exec.h"  /* DB_operation_t etc */
+#include "db.h"        /* DB, DBI, lmdb */
+#include "ops_creat.h" /* dbi_decl_t */
 
-#include "common.h"   /* EMlog, config */
-#include "security.h" /* security_check */
+#include "common.h"    /* EMlog, config */
+#include "security.h"  /* security_check */
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -139,6 +140,73 @@ static int _op_del(MDB_txn* txn, DB_operation_t* op);
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
+
+int ops_init_db(const char* const path, const unsigned int mode, dbi_decl_t* init_dbis,
+                unsigned n_dbis, int* const out_err)
+{
+    if(!path)
+    {
+        if(out_err) *out_err = -EINVAL;
+        EML_ERROR(LOG_TAG, "ops_init_db: invalid input (path=NULL)");
+        return DB_SAFETY_FAIL;
+    }
+
+    switch(ops_init_env(DB_MAX_DBIS, (size_t)DB_MAP_SIZE_INIT, path, mode, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_init_db: ops_init_env failed");
+            return DB_SAFETY_FAIL;
+    }
+
+    /* Init a transaction */
+    MDB_txn* txn = NULL;
+
+    switch(ops_txn_begin(&txn, 0, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_init_db: ops_txn_begin failed, err=%d",
+                      (out_err) ? *out_err : -1);
+            return DB_SAFETY_FAIL;
+    }
+
+    /* Initialize all requested dbis */
+    for(size_t i = 0; i < (size_t)n_dbis; i++)
+    {
+        dbi_decl_t* init_dbi = &init_dbis[i];
+        if(init_dbi)
+        {
+            EML_ERROR(LOG_TAG, "ops_init_db: invalid dbi_decl_t at index %zu", i);
+            mdb_txn_abort(txn);
+            return DB_SAFETY_FAIL;
+        }
+
+        switch(ops_init_dbi(txn, init_dbi->name, init_dbi->dbi_idx, init_dbi->type, out_err))
+        {
+            case DB_SAFETY_OK:
+                break;
+            default:
+                EML_ERROR(LOG_TAG, "ops_init_db: ops_init_dbi failed for dbi %s, err=%d",
+                          init_dbi->name, (out_err) ? *out_err : -1);
+                mdb_txn_abort(txn);
+                return DB_SAFETY_FAIL;
+        }
+    }
+
+    switch(ops_txn_commit(txn, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_PERR(LOG_TAG, "ops_init_db: ops_txn_commit failed err=%d", *out_err);
+            return DB_SAFETY_FAIL;
+    }
+
+    return DB_SAFETY_OK;
+}
 
 DB_operation_t* ops_create(size_t n_ops)
 {

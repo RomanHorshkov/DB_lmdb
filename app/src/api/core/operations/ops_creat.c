@@ -154,8 +154,73 @@ db_security_ret_code_t _db_set_map_size(const size_t db_map_size, int* const out
 db_security_ret_code_t _db_open_env(const char* const path, const unsigned int mode,
                                     int* const out_err);
 
+/**
+ * @brief Open a sub-database (DBI) within the environment.
+ *
+ * This internal helper opens a named sub-database (DBI) within the LMDB
+ * environment using the specified transaction. The function assumes that
+ * the environment and transaction are valid and that the DBI index is
+ * within bounds.
+ *
+ * @param txn Active LMDB transaction.
+ * @param dbi_idx Index of the DBI to open (must be < DataBase->n_dbis).
+ * @param name Name of the sub-database to open.
+ * @param open_flags Flags to use when opening the DBI (e.g., MDB_CREATE).
+ * @param[out] out_err Optional pointer to an integer to receive a platform-
+ * specific or implementation-specific error code when the operation fails.
+ * If @p out_err is non-NULL *out_err will be set to an errno-style value on
+ * failure, or left unchanged on success. The error code provides additional
+ * context describing the underlying cause.
+ *
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * on failure it returns one of the error codes defined by
+ * db_security_ret_code_t. Consult the enum definition.
+ *
+ * @note This function is part of the module's internal API and may have side
+ * effects such as creating directories or files and modifying global
+ * environment state. Callers must ensure it is invoked in an appropriate
+ * context and avoid concurrent calls from multiple threads unless external
+ * synchronization is provided.
+ *
+ * @warning If the function fails, the DBI may be left in a partially
+ * initialized state; callers should treat failure as non-recoverable unless
+ * specific recovery steps are documented elsewhere.
+ */
+db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
+                                 const char* const name, const unsigned int open_flags,
+                                 int* const out_err);
+
+/**
+ * @brief Retrieve and cache the flags for a sub-database (DBI).
+ * This internal helper fetches the flags associated with a previously
+ * opened sub-database (DBI) and caches them in the corresponding DBI
+ * descriptor within the global DataBase structure. The function assumes that
+ * the environment and transaction are valid and that the DBI index is
+ * within bounds.
+ * @param txn Active LMDB transaction.
+ * @param dbi_idx Index of the DBI to query (must be < DataBase->n_dbis).
+ * @param[out] out_err Optional pointer to an integer to receive a platform-
+ * specific or implementation-specific error code when the operation fails.
+ * If @p out_err is non-NULL *out_err will be set to an errno-style value on
+ * failure, or left unchanged on success. The error code provides additional
+ * context describing the underlying cause.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * on failure it returns one of the error codes defined by
+ * db_security_ret_code_t. Consult the enum definition.
+ * @note This function is part of the module's internal API and may have side
+ * effects such as creating directories or files and modifying global
+ * environment state. Callers must ensure it is invoked in an appropriate
+ * context and avoid concurrent calls from multiple threads unless external
+ * synchronization is provided.
+ * @warning If the function fails, the DBI flags may be left in an inconsistent
+ * state; callers should treat failure as non-recoverable unless specific
+ * recovery steps are documented elsewhere.
+ */
+db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx,
+                                      int* const out_err);
+
 /****************************************************************************
- * PUBLIC FUNCTIONS DEFINITIONS
+ * PRIVATE FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
@@ -247,10 +312,20 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db
     return DB_SAFETY_OK;
 }
 
-db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, unsigned int dbi_idx, unsigned int* const out_flags,
-                   int* const out_err)
+db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
+                                    unsigned int dbi_idx, dbi_type_t dbi_type, int* const out_err)
 {
-    /* Create environment */
+    if(!txn || dbi_idx >= DataBase->n_dbis)
+    {
+        if(out_err) *out_err = -EINVAL;
+        EML_ERROR(LOG_TAG, "ops_init_dbi: invalid input");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* derive open flags */
+    unsigned open_flags = dbi_open_flags_from_type(dbi_type);
+
+    /* Open DBI */
     switch(_dbi_open(txn, dbi_idx, name, open_flags, out_err))
     {
         case DB_SAFETY_OK:
@@ -259,15 +334,37 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, unsigned int dbi_idx, un
             EML_ERROR(LOG_TAG, "ops_init_dbi: _dbi_open failed");
             return DB_SAFETY_FAIL;
     }
-    ;
 
-    _dbi_get_flags(MDB_txn* const txn, unsigned int dbi_idx, int* const out_err);
+    /* set db_flags */
+    switch(_dbi_get_flags(txn, dbi_idx, out_err))
+    {
+        case DB_SAFETY_OK:
+            break;
+        default:
+            EML_ERROR(LOG_TAG, "ops_init_dbi: _dbi_open failed");
+            return DB_SAFETY_FAIL;
+    }
 
+    /* Get the indexed dbi */
+    dbi_desc_t* dbi = &DataBase->dbis[dbi_idx];
 
+    // /* set type */
+    // dbi->type = dbi_type;
+    // /* derive open flags */
+    // dbi->open_flags = open_flags;
+
+    /* derive put flags */
+    dbi->put_flags = dbi_desc_default_put_flags(dbi->db_flags);
+
+    /* derive dupfix and dupsort flags */
+    dbi->is_dupsort  = (dbi->db_flags & MDB_DUPSORT) != 0;
+    dbi->is_dupfixed = (dbi->db_flags & MDB_DUPFIXED) != 0;
+
+    return DB_SAFETY_OK;
 }
 
 /****************************************************************************
- * PRIVATE FUNCTIONS DEFINITIONS
+ * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
@@ -356,8 +453,9 @@ fail:
     return security_check(mdb_res, out_err);
 }
 
-int _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx, const char* const name,
-              const unsigned int open_flags, int* const out_err)
+db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
+                                 const char* const name, const unsigned int open_flags,
+                                 int* const out_err)
 {
     if(!txn || !name)
     {
@@ -377,7 +475,8 @@ fail:
     return security_check(mdb_res, out_err);
 }
 
-int _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx, int* const out_err)
+db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx,
+                                      int* const out_err)
 {
     if(!txn)
     {
@@ -387,7 +486,8 @@ int _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx, int* const ou
     }
 
     /* Get DBI flags */
-    int mdb_res = mdb_dbi_flags(txn, DataBase->dbis[dbi_idx].dbi, &DataBase->dbis[dbi_idx].db_flags);
+    int mdb_res =
+        mdb_dbi_flags(txn, DataBase->dbis[dbi_idx].dbi, &DataBase->dbis[dbi_idx].db_flags);
     if(mdb_res != 0) goto fail;
 
     return 0;

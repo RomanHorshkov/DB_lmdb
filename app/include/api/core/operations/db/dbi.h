@@ -26,17 +26,7 @@ extern "C"
  * PUBLIC DEFINES
  ****************************************************************************
 */
-
-/**
- * @brief Sentinel value used to request automatic default put flags.
- *
- * When a caller supplies this value for the @p put_flags parameter
- * of `db_lmdb_dbi_init`, the implementation will select a safe default based
- * on the resolved DB flags:
- *  - Non-DUPSORT: MDB_NOOVERWRITE (enforce unique keys)
- *  - DUPSORT:     MDB_NODUPDATA   (enforce unique duplicates)
- */
-#define DBI_PUT_FLAGS_AUTO 0xFFFFFFFFu
+/* None */
 
 /****************************************************************************
  * PUBLIC STRUCTURED TYPES
@@ -61,14 +51,14 @@ typedef enum
  */
 typedef struct
 {
-    unsigned int dbi; /**< LMDB handle. */
+    unsigned int dbi;         /**< LMDB handle. */
+    unsigned     db_flags;    /**< Cached mdb_dbi_flags(txn, dbi). */
+    unsigned     put_flags;   /**< Default flags to OR into mdb_put calls. */
+    unsigned     is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
+    unsigned     is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
     // const char*  name;        /**< Logical name (non-owning). */
-    dbi_type_t type;        /**< Requested logical type (flags). */
-    unsigned   open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
-    unsigned   db_flags;    /**< Cached mdb_dbi_flags(txn, dbi). */
-    unsigned   put_flags;   /**< Default flags to OR into mdb_put calls. */
-    int        is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
-    int        is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
+    // dbi_type_t type;        /**< Requested logical type (flags). */
+    // unsigned   open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
 } dbi_desc_t;
 
 /**
@@ -80,6 +70,7 @@ typedef struct
 {
     const char* name;
     dbi_type_t  type;
+    unsigned    dbi_idx;
 } dbi_decl_t;
 
 /****************************************************************************
@@ -97,6 +88,46 @@ typedef struct
  * @return 0 on success, negative errno on failure.
  */
 int db_lmdb_dbi_init(const dbi_decl_t* dbis, const uint8_t n_dbis);
+
+/**
+ * @brief Compute default put flags from DB flags.
+ * 
+ * @param db_flags DB flags as returned by mdb_dbi_flags().
+ * @return Computed default put flags.
+ */
+inline unsigned dbi_desc_default_put_flags(unsigned db_flags)
+{
+    return (db_flags & MDB_DUPSORT) ? MDB_NODUPDATA : MDB_NOOVERWRITE;
+}
+
+/**
+ * Compute mdb_dbi_open() flags from a dbi_type_t bitmask.
+ *
+ * This helper builds the set of flags to pass to mdb_dbi_open() by starting
+ * with MDB_CREATE (so the DBI is created if it does not exist) and then
+ * enabling additional LMDB behaviors based on the supplied dbi type bits:
+ * - DBI_TYPE_DUPSORT  -> adds MDB_DUPSORT  (allows multiple values per key, sorted)
+ * - DBI_TYPE_DUPFIXED -> adds MDB_DUPFIXED (duplicates are fixed-size values)
+ *
+ * Any dbi_type_t bits that do not map to a known LMDB flag are ignored.
+ *
+ * @param type Bitmask of DBI type flags (e.g. DBI_TYPE_DUPSORT, DBI_TYPE_DUPFIXED).
+ * @return Unsigned flags suitable for passing to mdb_dbi_open().
+ */
+/**
+ * @brief Compute mdb_dbi_open flags from requested dbi_type_t.
+ * 
+ * @param type Requested DBI type.
+ * @return Computed mdb_dbi_open flags.
+ */
+inline unsigned dbi_open_flags_from_type(dbi_type_t type)
+{
+    /* basic mdb create flag */
+    unsigned flags = MDB_CREATE;
+    if(type & DBI_TYPE_DUPSORT) flags |= MDB_DUPSORT;
+    if(type & DBI_TYPE_DUPFIXED) flags |= MDB_DUPFIXED;
+    return flags;
+}
 
 #ifdef __cplusplus
 }
