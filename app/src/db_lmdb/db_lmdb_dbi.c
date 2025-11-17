@@ -1,5 +1,12 @@
 /**
  * @file db_lmdb_dbi.c
+ * 
+ * @brief LMDB DBI management functions.
+ * 
+ * 
+ * @author  Roman Horshkov <roman.horshkov@gmail.com>
+ * @date    2025
+ * (c) 2025
  */
 
 #include "db_lmdb_dbi.h"      /* db_lmdb_dbi_*, dbi_desc_t */

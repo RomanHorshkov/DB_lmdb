@@ -1,5 +1,10 @@
 /**
  * @file db_lmdb.c
+ * 
+ * 
+ * @author  Roman Horshkov <roman.horshkov@gmail.com>
+ * @date    2025
+ * (c) 2025
  */
 
 #include "db_lmdb_core.h"     /* db_lmdb_create_env_safe etc */
