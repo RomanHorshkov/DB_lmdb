@@ -28,15 +28,12 @@
  ****************************************************************************
  */
 
+
 /**
- * @brief Choose a safe default set of mdb_put flags from cached DB flags.
- *
- * This function returns MDB_NODUPDATA when the DB is a DUPSORT database
- * (to enforce unique duplicates), or MDB_NOOVERWRITE for non-DUPSORT DBs
- * (to enforce unique keys).
- *
- * @param db_flags Cached flags (as returned by `mdb_dbi_flags`).
- * @return MDB_NODUPDATA or MDB_NOOVERWRITE depending on @p db_flags.
+ * @brief Compute default put flags from DB flags.
+ * 
+ * @param db_flags DB flags as returned by mdb_dbi_flags().
+ * @return Computed default put flags.
  */
 static inline unsigned dbi_desc_default_put_flags(unsigned db_flags)
 {
