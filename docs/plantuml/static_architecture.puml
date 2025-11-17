@@ -1,0 +1,92 @@
+@startuml
+' Standalone PlantUML (no external includes) for GitHub-rendered images via PlantUML server.
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam backgroundColor #FFFFFF
+skinparam dpi 140
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 14
+skinparam defaultTextAlignment left
+skinparam ArrowColor #2563EB
+skinparam ArrowThickness 1.5
+skinparam ArrowFontSize 13
+skinparam package {
+  BackgroundColor #EEF2FF
+  BorderColor #312E81
+  FontColor #111827
+  FontSize 14
+}
+skinparam rectangle {
+  FontColor #0F172A
+  FontSize 13
+  BorderColor #2563EB
+  BackgroundColor #DBEAFE
+  RoundCorner 6
+}
+skinparam component {
+  FontColor #0F172A
+  FontSize 13
+  BorderColor #1F2937
+  BackgroundColor #E5E7EB
+}
+skinparam note {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+  FontColor #7C2D12
+}
+skinparam legend {
+  BackgroundColor #F8FAFC
+  BorderColor #CBD5E1
+  FontColor #0F172A
+}
+skinparam component<<public>> {
+  BackgroundColor #DCFCE7
+  BorderColor #15803D
+}
+skinparam component<<internal>> {
+  BackgroundColor #FFE4E6
+  BorderColor #BE123C
+}
+
+title LMDB Wrapper — Static view
+
+package "Public surface" {
+  component "db_lmdb.h" <<public>> as api
+  component "db.h" <<public>> as db
+  component "dbi.h" <<public>> as dbi_h
+}
+
+package "Core" {
+  component "db_lmdb_core.c" as core
+  component "db_lmdb_dbi.c" as dbi
+}
+
+package "Ops" {
+  component "db_lmdb_ops.c" as ops
+  component "void_store.c" <<internal>> as void_store
+}
+
+component "internal.h / config.h" <<internal>> as internal
+component "LMDB C API" as lmdb
+component "EMlog" as emlog
+
+api --> core
+api --> db
+db --> dbi_h
+dbi_h --> dbi
+core --> dbi
+dbi --> ops
+ops --> void_store
+
+core --> internal
+dbi --> internal
+ops --> internal
+internal --> lmdb
+internal --> emlog
+
+note right of db
+Exposes dbi.h so callers can
+use dbi_desc_t alongside DB.
+end note
+
+@enduml

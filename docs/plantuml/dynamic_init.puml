@@ -1,0 +1,56 @@
+@startuml
+' Standalone PlantUML for init flow (no external includes).
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam backgroundColor #FFFFFF
+skinparam dpi 140
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 14
+skinparam defaultTextAlignment left
+skinparam ArrowColor #2563EB
+skinparam ArrowThickness 1.5
+skinparam ArrowFontSize 13
+skinparam sequence {
+  ArrowColor #2563EB
+  LifeLineBorderColor #94A3B8
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E5E7EB
+  ParticipantFontColor #0F172A
+  ParticipantFontSize 13
+  MessageAlign center
+  BoxBorderColor #CBD5E1
+  BoxBackgroundColor #F8FAFC
+}
+
+title Init flow — env + DBI setup
+
+actor App as Caller
+participant API as "db_lmdb_init"
+participant Core as "db_lmdb_core"
+participant DBI as "db_lmdb_dbi_init"
+database LMDB as "LMDB"
+
+Caller -> API : db_lmdb_init(dbi_decls, n_dbis, meta_dir)
+API -> Core : db_lmdb_create_env_safe(meta_dir, max_dbis, map_size)
+Core -> LMDB : mdb_env_create / set_maxdbs / set_mapsize / env_open
+Core --> API : DB->env ready
+
+API -> DBI : db_lmdb_dbi_init(decls, n_dbis)
+DBI -> Core : db_lmdb_txn_begin_safe(DB->env)
+loop for each dbi_decl_t
+    DBI -> Core : db_lmdb_dbi_open_safe(txn, name, flags)
+    DBI -> Core : db_lmdb_dbi_get_flags_safe(txn, dbi)
+    DBI --> DBI : cache dbi_desc_t (flags, names)
+end
+DBI -> Core : db_lmdb_txn_commit_safe(txn)
+DBI --> API : descriptors stored on DB->dbis
+API --> Caller : ready for operations
+
+legend right
+- DB owns env + dbi_desc_t array.
+- All LMDB calls only via db_lmdb_core safe wrappers.
+- Logging routes through internal.h → EMlog (not shown).
+endlegend
+
+@enduml

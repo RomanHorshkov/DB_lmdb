@@ -1,0 +1,82 @@
+' Base PlantUML styling for LMDB wrapper docs
+' Usage:
+'   !include base.puml
+'   @startuml
+'   ' your diagram
+'   @enduml
+'
+' Notes:
+' - GitHub does not render PlantUML directly; export to PNG/SVG and embed the image in Markdown.
+' - Keep diagrams small and composable; rely on this style for consistency.
+
+!pragma layout smetana
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam backgroundColor #FFFFFF
+skinparam dpi 140
+
+skinparam defaultFontName "Arial"
+skinparam defaultFontSize 14
+skinparam defaultTextAlignment left
+
+skinparam ArrowColor #2563EB
+skinparam ArrowThickness 1.5
+skinparam ArrowFontSize 13
+
+skinparam package {
+  BackgroundColor #EEF2FF
+  BorderColor #312E81
+  FontColor #111827
+  FontSize 14
+}
+
+skinparam rectangle {
+  FontColor #0F172A
+  FontSize 13
+  BorderColor #2563EB
+  BackgroundColor #DBEAFE
+  RoundCorner 6
+}
+
+skinparam component {
+  FontColor #0F172A
+  FontSize 13
+  BorderColor #1F2937
+  BackgroundColor #E5E7EB
+}
+
+skinparam note {
+  BackgroundColor #FFF7ED
+  BorderColor #EA580C
+  FontColor #7C2D12
+}
+
+skinparam sequence {
+  ArrowColor #2563EB
+  LifeLineBorderColor #94A3B8
+  LifeLineBackgroundColor #F8FAFC
+  ParticipantBorderColor #1F2937
+  ParticipantBackgroundColor #E5E7EB
+  ParticipantFontColor #0F172A
+  ParticipantFontSize 13
+  MessageAlign center
+  BoxBorderColor #CBD5E1
+  BoxBackgroundColor #F8FAFC
+}
+
+skinparam legend {
+  BackgroundColor #F8FAFC
+  BorderColor #CBD5E1
+  FontColor #0F172A
+}
+
+' Helper stereotypes for quick labeling; optional.
+skinparam component<<public>> {
+  BackgroundColor #DCFCE7
+  BorderColor #15803D
+}
+
+skinparam component<<internal>> {
+  BackgroundColor #FFE4E6
+  BorderColor #BE123C
+}
