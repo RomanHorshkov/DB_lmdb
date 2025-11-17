@@ -27,7 +27,6 @@
 #ifndef DB_OPERATIONS_H
 #define DB_OPERATIONS_H
 
-
 #ifdef __cplusplus
 extern "C"
 {

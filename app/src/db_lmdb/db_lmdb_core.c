@@ -113,22 +113,22 @@ int db_lmdb_txn_begin_safe(MDB_env* env, unsigned flags, MDB_txn** out_txn, size
 retry:
 {
     int res = mdb_txn_begin(env, NULL, flags, out_txn);
-    if (res != 0)
+    if(res != 0)
     {
         int act = _safety_check(res, 0, &budget, out_err, out_txn);
-        switch (act)
+        switch(act)
         {
-        case DB_LMDB_SAFE_OK: /* should not happen */
-            EML_WARN(LOG_TAG, "txn_begin_safe: unexpected SAFE_OK");
-            break;
-        case DB_LMDB_SAFE_RETRY:
-            /* update retry budget decreased in safety check */
-            if(retry_budget) *retry_budget = budget;
-            EML_WARN(LOG_TAG, "txn_begin_safe: retrying, retry_budget=%zu", budget);
-            goto retry;
-        default:
-            EML_ERROR(LOG_TAG, "txn_begin_safe: failed with err %d", res);
-            return DB_LMDB_SAFE_FAIL;
+            case DB_LMDB_SAFE_OK: /* should not happen */
+                EML_WARN(LOG_TAG, "txn_begin_safe: unexpected SAFE_OK");
+                break;
+            case DB_LMDB_SAFE_RETRY:
+                /* update retry budget decreased in safety check */
+                if(retry_budget) *retry_budget = budget;
+                EML_WARN(LOG_TAG, "txn_begin_safe: retrying, retry_budget=%zu", budget);
+                goto retry;
+            default:
+                EML_ERROR(LOG_TAG, "txn_begin_safe: failed with err %d", res);
+                return DB_LMDB_SAFE_FAIL;
         }
     }
 }
@@ -149,22 +149,22 @@ int db_lmdb_txn_commit_safe(MDB_txn* txn, size_t* retry_budget, int* out_err)
 retry:
 {
     int res = mdb_txn_commit(txn);
-    if (res != 0)
+    if(res != 0)
     {
         int act = _safety_check(res, 0, &budget, out_err, txn);
-        switch (act)
+        switch(act)
         {
-        case DB_LMDB_SAFE_OK: /* should not happen */
-            EML_WARN(LOG_TAG, "txn_commit_safe: unexpected SAFE_OK");
-            break;
-        case DB_LMDB_SAFE_RETRY:
-            /* update retry budget decreased in safety check */
-            if(retry_budget) *retry_budget = budget;
-            EML_WARN(LOG_TAG, "txn_commit_safe: retrying, retry_budget=%zu", budget);
-            goto retry;
-        default:
-            EML_ERROR(LOG_TAG, "txn_commit_safe: failed with err %d", res);
-            return DB_LMDB_SAFE_FAIL;
+            case DB_LMDB_SAFE_OK: /* should not happen */
+                EML_WARN(LOG_TAG, "txn_commit_safe: unexpected SAFE_OK");
+                break;
+            case DB_LMDB_SAFE_RETRY:
+                /* update retry budget decreased in safety check */
+                if(retry_budget) *retry_budget = budget;
+                EML_WARN(LOG_TAG, "txn_commit_safe: retrying, retry_budget=%zu", budget);
+                goto retry;
+            default:
+                EML_ERROR(LOG_TAG, "txn_commit_safe: failed with err %d", res);
+                return DB_LMDB_SAFE_FAIL;
         }
     }
 }
