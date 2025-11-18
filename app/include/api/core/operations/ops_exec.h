@@ -48,6 +48,25 @@ struct void_store_t; /* forward declaration */
  */
 
 /**
+ * @brief Source of the key for an operation.
+ */
+typedef enum
+{
+    OP_KEY_SRC_THIS = 0, /**< key is from this operation */
+    OP_KEY_SRC_KEY  = 1, /**< key is from some prev operation's key */
+    OP_KEY_SRC_VAL  = 2  /**< key is from some prev operation's value */
+} op_key_source_t;
+
+/**
+ * @brief Reference to another operation's result for key sourcing.
+ */
+typedef struct
+{
+    unsigned int    op_index; /**< Index of the operation to source key from. */
+    op_key_source_t src_type; /**< Source type (key or value). */
+} op_key_ref_t;
+
+/**
  * @brief Operation kind.
  */
 typedef enum
@@ -59,18 +78,18 @@ typedef enum
     DB_OPERATION_LST,      /**< Reserved for future list/scan helpers. */
     DB_OPERATION_DEL,      /**< Delete by key or (key, dup-value). */
     DB_OPERATION_MAX
-} DB_operation_type_t;
+} op_type_t;
 
 typedef struct
 {
-    DB_operation_type_t type;      /**< Operation kind. */
-    unsigned int        dbi;       /**< Target DBI handle. */
-    void_store_t*       key_store; /**< Key bytes store. */
-    void_store_t*       val_store; /**< Concatenated value bytes/patch. */
-    unsigned            flags;     /**< LMDB flags (e.g., MDB_NOOVERWRITE/MDB_APPEND). */
-
-    void*  dst;                    /**< Result buffer for GET (owned by op). */
-    size_t dst_len;                /**< Result length for GET. */
+    op_type_t     type;      /**< Operation kind. */
+    unsigned int  dbi;       /**< Target DBI handle. */
+    void_store_t* key_store; /**< Key bytes store. */
+    void_store_t* val_store; /**< Concatenated value bytes/patch. */
+    unsigned      flags;     /**< LMDB flags (e.g., MDB_NOOVERWRITE/MDB_APPEND). */
+    
+    void*         dst;       /**< Result buffer for GET (owned by op). */
+    size_t        dst_len;   /**< Result length for GET. */
 } DB_operation_t;
 
 /**

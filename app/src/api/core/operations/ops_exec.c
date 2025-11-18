@@ -61,7 +61,7 @@ static int _prepare_key(void_store_t** st, void* key_seg, size_t seg_size);
  * @param[in]  dbi   Target database handle.
  * @param[in]  flags LMDB flags for PUT/DEL (e.g., MDB_NOOVERWRITE).
  */
-static void _prepare_op(DB_operation_t* op, DB_operation_type_t type, MDB_dbi dbi, unsigned flags);
+static void _prepare_op(DB_operation_t* op, op_type_t type, MDB_dbi dbi, unsigned flags);
 
 /**
  * @brief Execute a single operation within an existing transaction.
@@ -612,7 +612,7 @@ static int _prepare_key(void_store_t** st, void* key_seg, size_t seg_size)
     return 0;
 }
 
-static void _prepare_op(DB_operation_t* op, DB_operation_type_t type, MDB_dbi dbi, unsigned flags)
+static void _prepare_op(DB_operation_t* op, op_type_t type, MDB_dbi dbi, unsigned flags)
 {
     op->type  = type;
     op->dbi   = dbi;

@@ -113,7 +113,7 @@ db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const 
  * initialized state; callers should treat failure as non-recoverable unless
  * specific recovery steps are documented elsewhere.
  */
-db_security_ret_code_t _db_set_map_size(const size_t db_map_size, int* const out_err);
+db_security_ret_code_t _db_set_map_size(int* const out_err);
 
 /**
  * @brief Open the database environment at the specified path.
@@ -233,7 +233,7 @@ db_security_ret_code_t ops_txn_begin(MDB_txn** out_txn, const unsigned flags, in
     security_check on hot path */
     if(mdb_res != 0)
     {
-        return security_check(mdb_res, out_err);
+        return security_check(mdb_res, NULL, out_err);
     }
 
     return DB_SAFETY_OK;
@@ -253,14 +253,13 @@ db_security_ret_code_t ops_txn_commit(MDB_txn* const txn, int* const out_err)
     security_check on hot path */
     if(mdb_res != 0)
     {
-        return security_check(mdb_res, out_err);
+        return security_check(mdb_res, txn, out_err);
     }
     return DB_SAFETY_OK;
 }
 
-db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db_map_size,
-                                    const char* const path, const unsigned int mode,
-                                    int* const out_err)
+db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
+                                    const unsigned int mode, int* const out_err)
 {
     /* Do NOT allow retry at initialization */
 
@@ -270,7 +269,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db
         case DB_SAFETY_OK:
             break;
         default:
-            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_create_env failed");
+            EML_ERROR(LOG_TAG, "_init_env: _create_env failed");
             return DB_SAFETY_FAIL;
     }
 
@@ -280,17 +279,17 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db
         case DB_SAFETY_OK:
             break;
         default:
-            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_set_max_dbis failed");
+            EML_ERROR(LOG_TAG, "_init_env: _set_max_dbis failed");
             return DB_SAFETY_FAIL;
     }
 
     /* Set map size */
-    switch(_db_set_map_size(db_map_size, out_err))
+    switch(_db_set_map_size(out_err))
     {
         case DB_SAFETY_OK:
             break;
         default:
-            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_set_map_size failed");
+            EML_ERROR(LOG_TAG, "_init_env: _set_map_size failed");
             return DB_SAFETY_FAIL;
     }
 
@@ -300,7 +299,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db
         case DB_SAFETY_OK:
             break;
         default:
-            EML_ERROR(LOG_TAG, "ops_exec_create_env: _db_open_env failed");
+            EML_ERROR(LOG_TAG, "_init_env: _open_env failed");
             return DB_SAFETY_FAIL;
     }
 
@@ -341,7 +340,7 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     }
 
     /* Get the indexed dbi */
-    dbi_desc_t* dbi = &DataBase->dbis[dbi_idx];
+    dbi_t* dbi = &DataBase->dbis[dbi_idx];
 
     // /* set type */
     // dbi->type = dbi_type;
@@ -384,7 +383,7 @@ fail:
         DataBase->env = NULL;
     }
     LMDB_EML_ERR(LOG_TAG, "_create_env: mdb_env_create failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, NULL, out_err);
 }
 
 db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const out_err)
@@ -404,27 +403,19 @@ db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const 
 
 fail:
     LMDB_EML_ERR(LOG_TAG, "_set_max_dbis failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, NULL, out_err);
 }
 
-db_security_ret_code_t _db_set_map_size(const size_t db_map_size, int* const out_err)
+db_security_ret_code_t _db_set_map_size(int* const out_err)
 {
-    /* Check input */
-    if(db_map_size == 0)
-    {
-        if(out_err) *out_err = -EINVAL;
-        EML_ERROR(LOG_TAG, "_set_map_size: db_map_size cannot be zero");
-        return DB_SAFETY_FAIL;
-    }
-
     /* Set initial map size */
-    int mdb_res = mdb_env_set_mapsize(DataBase->env, db_map_size);
+    int mdb_res = mdb_env_set_mapsize(DataBase->env, DB_MAP_SIZE_INIT);
     if(mdb_res != 0) goto fail;
     return 0;
 
 fail:
     LMDB_EML_ERR(LOG_TAG, "_set_map_size failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, NULL, out_err);
 }
 
 db_security_ret_code_t _db_open_env(const char* const path, const unsigned int mode,
@@ -444,7 +435,7 @@ db_security_ret_code_t _db_open_env(const char* const path, const unsigned int m
 
 fail:
     LMDB_EML_ERR(LOG_TAG, "_open_env failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, NULL, out_err);
 }
 
 db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
@@ -466,7 +457,7 @@ db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
 
 fail:
     LMDB_EML_ERR(LOG_TAG, "_dbi_open failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, txn, out_err);
 }
 
 db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx,
@@ -487,5 +478,5 @@ db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi
     return 0;
 fail:
     LMDB_EML_ERR(LOG_TAG, "_dbi_get_flags failed", mdb_res);
-    return security_check(mdb_res, out_err);
+    return security_check(mdb_res, txn, out_err);
 }

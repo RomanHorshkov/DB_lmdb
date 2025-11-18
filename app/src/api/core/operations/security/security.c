@@ -121,7 +121,7 @@ int _expand_env_mapsize(void);
  ****************************************************************************
  */
 
-db_security_ret_code_t security_check(const int mdb_rc, MDB_txn* txn, int* const out_errno)
+db_security_ret_code_t security_check(const int mdb_rc, MDB_txn* const txn, int* const out_errno)
 {
     /* Fast path */
     if(mdb_rc == MDB_SUCCESS) return DB_SAFETY_OK;
@@ -231,8 +231,21 @@ int _expand_env_mapsize(void)
     /* Check database min health */
     if(!(DataBase && DataBase->env)) return -EIO;
 
+    /* Get straigth environment info */
+    unsigned int retries = 3;
+    MDB_envinfo  info;
+    while((mdb_env_info(DataBase->env, &info) != MDB_SUCCESS) && retries > 0)
+    {
+        retries--;
+    }
+    if(retries == 0)
+    {
+        EML_ERROR(LOG_TAG, "_expand_env_mapsize: mdb_env_info failed after retries");
+        return -EIO;
+    }
+
     /* Double current map size */
-    size_t desired = DataBase->map_size_bytes * 2;
+    size_t desired = info.me_mapsize * 2;
 
     /* Check against max, allow equal */
     if(desired > DataBase->map_size_bytes_max)
@@ -248,9 +261,6 @@ int _expand_env_mapsize(void)
         EML_ERROR(LOG_TAG, "_expand_env_mapsize: mdb_env_set_mapsize failed %d", set);
         return set;
     }
-
-    /* Update DataBase info */
-    DataBase->map_size_bytes = desired;
 
     return set;
 }

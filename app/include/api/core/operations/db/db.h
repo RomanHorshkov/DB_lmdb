@@ -27,7 +27,6 @@ typedef struct
     MDB_env* env;                /* LMDB environment */
     dbi_t*   dbis;               /* array of DBI descriptors */
     uint8_t  n_dbis;             /* number of DBIs in array */
-    size_t   map_size_bytes;     /* current map size */
     size_t   map_size_bytes_max; /* maximum map size */
 } DataBase_t;
 
