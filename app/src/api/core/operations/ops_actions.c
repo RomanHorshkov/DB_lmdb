@@ -1,0 +1,163 @@
+
+
+#include "ops_actions.h" /* ops_init_dbi etc */
+
+#define LOG_TAG "ops_act"
+
+/**
+ * @brief Resolve a key/value descriptor to an MDB_val pointer.
+ *
+ * This helper walks an @ref op_key_t descriptor and, when necessary,
+ * follows backward references to earlier operations in the batch.
+ * It supports:
+ *  - OP_KEY_KIND_PRESENT: bytes are embedded in @p desc->present.
+ *  - OP_KEY_KIND_LOOKUP + OP_KEY_SRC_KEY: data comes from a previous
+ *    operation's key (recursively resolved, so chains are allowed).
+ *  - OP_KEY_KIND_LOOKUP + OP_KEY_SRC_VAL: data comes from a previous
+ *    operation's value (also recursively resolved).
+ *
+ * On any contract violation (invalid kind/src_type, empty PRESENT),
+ * the function logs an error and returns NULL.
+ *
+ * @param base Operation whose descriptor is being resolved. It must
+ *             belong to a contiguous array of ops; LOOKUP indices are
+ *             interpreted as “how many positions back from base”.
+ * @param desc Descriptor to resolve (key or value).
+ */
+static MDB_val* _resolve_desc(op_t* base, op_key_t* desc)
+{
+    if(!base || !desc)
+    {
+        EML_ERROR(LOG_TAG, "_resolve_desc: base=%p desc=%p", (void*)base, (void*)desc);
+        return NULL;
+    }
+
+    MDB_val* k_ptr = NULL;
+
+    switch(desc->kind)
+    {
+        /* bytes are present in this descriptor */
+        case OP_KEY_KIND_PRESENT:
+            /**
+             * Assume that desc->present is already populated, cast it to
+             * MDB_val* and use it directly. This is safe because op_val_t
+             * is layout-compatible with MDB_val.
+             */
+            if(!desc->present.ptr || desc->present.size == 0)
+            {
+                EML_ERROR(LOG_TAG, "_resolve_desc: PRESENT has invalid buffer (ptr=%p size=%zu)",
+                          desc->present.ptr, desc->present.size);
+                return NULL;
+            }
+            k_ptr = (MDB_val*)&desc->present;
+            break;
+
+        /* data is in some previous operation */
+        case OP_KEY_KIND_LOOKUP:
+        {
+            /* Get the referenced operation (ops_add_operation validated index) */
+            op_t* lookup_op = base - desc->lookup.op_index;
+
+            /* Choose source from the referenced op */
+            switch(desc->lookup.src_type)
+            {
+                case OP_KEY_SRC_KEY:
+                    /**
+                     * KEY-from-KEY (or VAL-from-KEY) lookup: resolve the
+                     * referenced op's key recursively so chains are supported.
+                     */
+                    k_ptr = _resolve_desc(lookup_op, &lookup_op->key);
+                    break;
+
+                case OP_KEY_SRC_VAL:
+                    /**
+                     * KEY/VAL-from-VAL lookup: resolve the referenced
+                     * op's value recursively.
+                     */
+                    k_ptr = _resolve_desc(lookup_op, &lookup_op->val);
+                    break;
+
+                default:
+                    EML_ERROR(LOG_TAG, "_resolve_desc: invalid source type=%d",
+                              desc->lookup.src_type);
+                    return NULL;
+            } /* switch(src_type) */
+            break;
+        }
+
+        default:
+            EML_ERROR(LOG_TAG, "_resolve_desc: invalid kind=%d", desc->kind);
+            return NULL;
+    } /* switch(kind) */
+
+    return k_ptr;
+}
+
+/**
+ * @brief Resolve the key for an operation.
+ *
+ * Thin wrapper over _resolve_desc that binds the descriptor to op->key.
+ */
+static MDB_val* _get_key(op_t* op)
+{
+    return _resolve_desc(op, &op->key);
+}
+
+db_security_ret_code_t op_get(MDB_txn* txn, op_t* op, int* const out_err)
+{
+    /* Check input */
+    if(!txn || !op)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: invalid input");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get key pointer */
+    MDB_val* k_ptr = _get_key(op);
+    if(!k_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get val */
+    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val);
+    if(mdb_res != 0) return security_check(mdb_res, txn, NULL);
+    return DB_SAFETY_SUCCESS;
+}
+
+db_security_ret_code_t op_put(MDB_txn* txn, op_t* op, int* const out_err)
+{
+    /* Check input */
+    if(!txn || !op)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: invalid input");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get key pointer */
+    MDB_val* k_ptr = _get_key(op);
+    if(!k_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get val pointer */
+    MDB_val* v_ptr = _get_key(op);
+    if(!v_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve val");
+        return DB_SAFETY_FAIL;
+    }
+
+    dbi_t* dbi = &DataBase->dbis[op->dbi];
+
+    /* Put val */
+    /* DO NOT add MDB_RESERVE here */
+    /* Use the put flags in the Database */
+    int mdb_res = mdb_put(txn, op->dbi, k_ptr, v_ptr, dbi->put_flags);
+    if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, NULL);
+    return DB_SAFETY_SUCCESS;
+
+}

@@ -23,7 +23,7 @@ extern "C"
 */
 typedef enum
 {
-    DB_SAFETY_OK    = 0, /* proceed */
+    DB_SAFETY_SUCCESS    = 0, /* proceed */
     DB_SAFETY_RETRY = 3, /* retry */
     DB_SAFETY_FAIL  = 7  /* fail */
 } db_security_ret_code_t;
@@ -50,7 +50,7 @@ typedef enum
  * POSIX-style `errno` mapping for the underlying condition.
  *
  * Decision summary:
- * - MDB_SUCCESS -> `DB_SAFETY_OK`
+ * - MDB_SUCCESS -> `DB_SAFETY_SUCCESS`
  * - Resizable or transient conditions (e.g. `MDB_MAP_RESIZED`, `MDB_MAP_FULL`,
  *   `MDB_PAGE_FULL`, `MDB_TXN_FULL`, `MDB_CURSOR_FULL`, `MDB_BAD_RSLOT`,
  *   `MDB_READERS_FULL`) -> abort supplied txn (if any) and either attempt map

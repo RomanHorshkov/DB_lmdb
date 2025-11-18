@@ -80,7 +80,7 @@ int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* in
     /* Do not allow retry on init */
     switch(ops_init_env(DB_MAX_DBIS, path, mode, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _init_env failed, err=%d", out_err_val);
@@ -92,7 +92,7 @@ int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* in
 
     switch(ops_txn_begin(&txn, 0, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _txn_begin failed, err=%d", out_err_val);
@@ -112,7 +112,7 @@ int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* in
         dbi_init_t* init_dbi = &init_dbis[i];
         switch(ops_init_dbi(txn, init_dbi->name, init_dbi->dbi_idx, init_dbi->type, out_err))
         {
-            case DB_SAFETY_OK:
+            case DB_SAFETY_SUCCESS:
                 break;
             default:
                 EML_ERROR(LOG_TAG, "_init_db: _init_dbi failed for dbi %s, err=%d", init_dbi->name,
@@ -123,7 +123,7 @@ int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* in
 
     switch(ops_txn_commit(txn, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_PERR(LOG_TAG, "_init_db: _txn_commit failed err=%d", *out_err);
@@ -137,10 +137,13 @@ fail:
     return out_err_val;
 }
 
-int core_db_op_add(const op_type_t op_type, const unsigned int dbi_idx, op_key_ref_t ket_ref, void_store_t* key_vs, void_store_t* val_vs,
-                   DB_operation_t** out_op)
+int core_db_op_add(const unsigned int dbi_idx, const op_type_t op_type, op_key_t key, op_val_t val)
 {
-    
+    return ops_add_operation(dbi_idx, op_type, key, val);
+}
+
+int core_db_op_execute(/* TODO params */)
+{
     return 0;
 }
 

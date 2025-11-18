@@ -22,6 +22,8 @@
         "ops_setup.h": "c",
         "db.h": "c",
         "core.h": "c",
-        "dbi.h": "c"
+        "dbi.h": "c",
+        "type_traits": "c",
+        "utility": "c"
     }
 }

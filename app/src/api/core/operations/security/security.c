@@ -37,7 +37,7 @@
  * int err_no;
  * db_security_ret_code_t safety = security_check(mdb_rc, txn, &err_no);
  * switch (safety) {
- * case DB_SAFETY_OK:    // success, continue
+ * case DB_SAFETY_SUCCESS:    // success, continue
  * case DB_SAFETY_RETRY: // caller should retry the operation
  * case DB_SAFETY_FAIL:  // terminal failure, propagate error
  * }
@@ -124,7 +124,7 @@ int _expand_env_mapsize(void);
 db_security_ret_code_t security_check(const int mdb_rc, MDB_txn* const txn, int* const out_errno)
 {
     /* Fast path */
-    if(mdb_rc == MDB_SUCCESS) return DB_SAFETY_OK;
+    if(mdb_rc == MDB_SUCCESS) return DB_SAFETY_SUCCESS;
 
     /* Map error if requested */
     if(out_errno) *out_errno = _map_mdb_err_to_errno(mdb_rc);

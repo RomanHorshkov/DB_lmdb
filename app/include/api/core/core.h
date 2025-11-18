@@ -16,6 +16,11 @@ extern "C"
 {
 #endif
 
+// forwared declarations
+typedef enum op_type_t  op_type_t;
+typedef struct op_key_t op_key_t;
+typedef struct op_val_t op_val_t;
+
 /****************************************************************************
  * PUBLIC DEFINES
  ****************************************************************************
@@ -45,6 +50,10 @@ extern "C"
  */
 int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
                  unsigned n_dbis);
+
+int core_db_op_add(const unsigned int dbi_idx, const op_type_t op_type, op_key_t key, op_val_t val);
+
+int core_db_op_execute(/* TODO params */);
 
 /**
  * @brief Gracefully shut down the LMDB environment and free DB resources.

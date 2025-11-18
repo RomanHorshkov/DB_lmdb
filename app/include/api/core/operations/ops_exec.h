@@ -13,7 +13,7 @@
  *
  * Usage snippet:
  * @code
- * DB_operation_t* ops = ops_create(2);
+ * op_t* ops = ops_create(2);
  * ops_get_prepare(&ops[0], db_user_mail2id, email, strlen(email));
  * ops_get_prepare(&ops[1], db_user_id2pwd, NULL, 0); // key from prev->dst
  * size_t n = 2;
@@ -48,51 +48,6 @@ struct void_store_t; /* forward declaration */
  */
 
 /**
- * @brief Source of the key for an operation.
- */
-typedef enum
-{
-    OP_KEY_SRC_THIS = 0, /**< key is from this operation */
-    OP_KEY_SRC_KEY  = 1, /**< key is from some prev operation's key */
-    OP_KEY_SRC_VAL  = 2  /**< key is from some prev operation's value */
-} op_key_source_t;
-
-/**
- * @brief Reference to another operation's result for key sourcing.
- */
-typedef struct
-{
-    unsigned int    op_index; /**< Index of the operation to source key from. */
-    op_key_source_t src_type; /**< Source type (key or value). */
-} op_key_ref_t;
-
-/**
- * @brief Operation kind.
- */
-typedef enum
-{
-    DB_OPERATION_NONE = 0, /**< Uninitialized placeholder. */
-    DB_OPERATION_PUT,      /**< Insert/replace value; honors MDB flags. */
-    DB_OPERATION_GET,      /**< Lookup by key; fills op->dst/op->dst_len. */
-    DB_OPERATION_REP,      /**< In-place patch of existing value (cursor + RESERVE). */
-    DB_OPERATION_LST,      /**< Reserved for future list/scan helpers. */
-    DB_OPERATION_DEL,      /**< Delete by key or (key, dup-value). */
-    DB_OPERATION_MAX
-} op_type_t;
-
-typedef struct
-{
-    op_type_t     type;      /**< Operation kind. */
-    unsigned int  dbi;       /**< Target DBI handle. */
-    void_store_t* key_store; /**< Key bytes store. */
-    void_store_t* val_store; /**< Concatenated value bytes/patch. */
-    unsigned      flags;     /**< LMDB flags (e.g., MDB_NOOVERWRITE/MDB_APPEND). */
-    
-    void*         dst;       /**< Result buffer for GET (owned by op). */
-    size_t        dst_len;   /**< Result length for GET. */
-} DB_operation_t;
-
-/**
  * @brief Allocate a zero-initialized array of operations.
  *
  * @param[in] n_ops Number of elements.
@@ -100,7 +55,7 @@ typedef struct
  *
  * @note Free with @ref ops_free.
  */
-DB_operation_t* ops_create(size_t n_ops);
+op_t* ops_create(size_t n_ops);
 
 /**
  * @brief Execute a single PUT operation (one-shot helper).
@@ -147,7 +102,7 @@ int ops_put_one_desc(const dbi_desc_t* desc, const void* key, size_t klen, const
  * @param[in]  flags         LMDB put flags (e.g., MDB_NOOVERWRITE).
  * @return 0 on success, negative errno on failure.
  */
-int ops_put_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
+int ops_put_prepare(op_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs, unsigned flags);
 /**
  * @brief Append one value segment to the prepared PUT.
@@ -157,7 +112,7 @@ int ops_put_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, s
  * @param[in]     val_seg_size Segment size (>0).
  * @return 0 on success, negative errno on failure.
  */
-int ops_put_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_size);
+int ops_put_prepare_add(op_t* op, const void* val_seg, size_t val_seg_size);
 
 /** @} */
 
@@ -180,7 +135,7 @@ int ops_put_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_
  *
  * @note On success, @ref ops_exec allocates @c op->dst for the value.
  */
-int ops_get_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t seg_size);
+int ops_get_prepare(op_t* op, unsigned int dbi, const void* key_seg, size_t seg_size);
 
 /**
  * @brief Single-shot GET for a key.
@@ -230,7 +185,7 @@ int ops_get_one(unsigned int dbi, const void* key, size_t klen, void* out, size_
  * @param[in]  nsegs         Number of patch segments.
  * @return 0 on success, negative errno on failure.
  */
-int ops_rep_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
+int ops_rep_prepare(op_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs);
 /**
  * @brief Append one patch segment for REP.
@@ -240,7 +195,7 @@ int ops_rep_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, s
  * @param[in]     val_seg_size  Length in bytes (>0).
  * @return 0 on success, negative errno on failure.
  */
-int ops_rep_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_size);
+int ops_rep_prepare_add(op_t* op, const void* val_seg, size_t val_seg_size);
 
 /** @} */
 
@@ -272,7 +227,7 @@ int ops_lst_prepare(void);
  * @param[in]  nsegs         0 or 1 value segment for dup-exact delete.
  * @return 0 on success, negative errno on failure.
  */
-int ops_del_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
+int ops_del_prepare(op_t* op, unsigned int dbi, const void* key_seg, size_t key_seg_size,
                     size_t nsegs);
 
 /**
@@ -283,7 +238,7 @@ int ops_del_prepare(DB_operation_t* op, unsigned int dbi, const void* key_seg, s
  * @param[in]     val_seg_size  Size in bytes (>0).
  * @return 0 on success, negative errno on failure.
  */
-int ops_del_prepare_add(DB_operation_t* op, const void* val_seg, size_t val_seg_size);
+int ops_del_prepare_add(op_t* op, const void* val_seg, size_t val_seg_size);
 
 /**
  * @brief Single-shot DEL for a key (and optional exact value).
@@ -318,7 +273,7 @@ int ops_del_one(unsigned int dbi, const void* key, size_t klen, const void* val,
  * @warning On GET success, @c op->dst is heap-allocated and must be
  *          released by @ref ops_free (or manually by the caller).
  */
-int ops_exec(DB_operation_t* ops, size_t* n_ops);
+int ops_exec(op_t* ops, size_t* n_ops);
 
 /**
  * @brief Free an array of operations and all owned resources.
@@ -331,7 +286,7 @@ int ops_exec(DB_operation_t* ops, size_t* n_ops);
  * @param[in,out] ops   Pointer to array pointer.
  * @param[in,out] n_ops Pointer to count (will be set to 0).
  */
-void ops_free(DB_operation_t** ops, size_t* n_ops);
+void ops_free(op_t** ops, size_t* n_ops);
 
 /** @} */ /* end of group dbops */
 

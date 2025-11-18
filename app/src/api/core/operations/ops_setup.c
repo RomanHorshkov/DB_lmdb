@@ -1,5 +1,5 @@
 
-#include "ops_setup.h" /* DB_operation_t etc */
+#include "ops_setup.h" /* op_t etc */
 
 /************************************************************************
  * PRIVATE DEFINES
@@ -38,7 +38,7 @@
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
  *
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  *
@@ -69,7 +69,7 @@ db_security_ret_code_t _db_create_env(int* const out_err);
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
  *
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  *
@@ -99,7 +99,7 @@ db_security_ret_code_t _db_set_max_dbis(const unsigned int max_dbis, int* const 
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
  *
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  *
@@ -130,7 +130,7 @@ db_security_ret_code_t _db_set_map_size(int* const out_err);
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
  *
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  *
@@ -165,7 +165,7 @@ db_security_ret_code_t _db_open_env(const char* const path, const unsigned int m
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
  *
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  *
@@ -197,7 +197,7 @@ db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
  * If @p out_err is non-NULL *out_err will be set to an errno-style value on
  * failure, or left unchanged on success. The error code provides additional
  * context describing the underlying cause.
- * @return db_security_ret_code_t value. On success returns DB_SAFETY_OK.
+ * @return db_security_ret_code_t value. On success returns DB_SAFETY_SUCCESS.
  * on failure it returns one of the error codes defined by
  * db_security_ret_code_t. Consult the enum definition.
  * @note This function is part of the module's internal API and may have side
@@ -233,10 +233,10 @@ db_security_ret_code_t ops_txn_begin(MDB_txn** out_txn, const unsigned flags, in
     security_check on hot path */
     if(mdb_res != 0)
     {
+        EML_ERROR(LOG_TAG, "_txn_begin: mdb_txn_begin failed, mdb_rc=%d", mdb_res);
         return security_check(mdb_res, NULL, out_err);
     }
-
-    return DB_SAFETY_OK;
+    return DB_SAFETY_SUCCESS;
 }
 
 db_security_ret_code_t ops_txn_commit(MDB_txn* const txn, int* const out_err)
@@ -253,9 +253,10 @@ db_security_ret_code_t ops_txn_commit(MDB_txn* const txn, int* const out_err)
     security_check on hot path */
     if(mdb_res != 0)
     {
+        EML_ERROR(LOG_TAG, "_txn_commit: mdb_txn_commit failed, mdb_rc=%d", mdb_res);
         return security_check(mdb_res, txn, out_err);
     }
-    return DB_SAFETY_OK;
+    return DB_SAFETY_SUCCESS;
 }
 
 db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
@@ -266,7 +267,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     /* Create environment */
     switch(_db_create_env(out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _create_env failed");
@@ -276,7 +277,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     /* Set max DBIs */
     switch(_db_set_max_dbis(max_dbis, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_max_dbis failed");
@@ -286,7 +287,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     /* Set map size */
     switch(_db_set_map_size(out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_map_size failed");
@@ -296,14 +297,14 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     /* Open environment */
     switch(_db_open_env(path, mode, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _open_env failed");
             return DB_SAFETY_FAIL;
     }
 
-    return DB_SAFETY_OK;
+    return DB_SAFETY_SUCCESS;
 }
 
 db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
@@ -322,7 +323,7 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     /* Open DBI */
     switch(_dbi_open(txn, dbi_idx, name, open_flags, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "ops_init_dbi: _dbi_open failed");
@@ -332,7 +333,7 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     /* set db_flags */
     switch(_dbi_get_flags(txn, dbi_idx, out_err))
     {
-        case DB_SAFETY_OK:
+        case DB_SAFETY_SUCCESS:
             break;
         default:
             EML_ERROR(LOG_TAG, "ops_init_dbi: _dbi_open failed");
@@ -354,7 +355,7 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     dbi->is_dupsort  = (dbi->db_flags & MDB_DUPSORT) != 0;
     dbi->is_dupfixed = (dbi->db_flags & MDB_DUPFIXED) != 0;
 
-    return DB_SAFETY_OK;
+    return DB_SAFETY_SUCCESS;
 }
 
 /****************************************************************************
