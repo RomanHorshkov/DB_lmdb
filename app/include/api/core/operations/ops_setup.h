@@ -6,7 +6,7 @@
 #define DB_OPERATIONS_OPS_EXEC_H_
 
 #include "db.h"
-#include "security.h"
+#include "security.h" /* espose for ops_exec */
 
 /****************************************************************************
  * PUBLIC FUNCTIONS PROTOTYPES

@@ -6,7 +6,7 @@
 #ifndef DB_LMDB_DB_H
 #define DB_LMDB_DB_H
 
-#include "dbi.h" /* dbi_desc_t */
+#include "dbi.h" /* dbi_desc_t, dbi_init_t, and everything else */
 
 /****************************************************************************
  * PUBLIC DEFINES
@@ -24,15 +24,15 @@
  */
 typedef struct
 {
-    MDB_env*    env;                /* LMDB environment */
-    dbi_desc_t* dbis;               /* array of DBI descriptors */
-    uint8_t     n_dbis;             /* number of DBIs in array */
-    size_t      map_size_bytes;     /* current map size */
-    size_t      map_size_bytes_max; /* maximum map size */
+    MDB_env* env;                /* LMDB environment */
+    dbi_t*   dbis;               /* array of DBI descriptors */
+    uint8_t  n_dbis;             /* number of DBIs in array */
+    size_t   map_size_bytes;     /* current map size */
+    size_t   map_size_bytes_max; /* maximum map size */
 } DataBase_t;
 
 /************************************************************************
- * PRIVATE VARIABLES
+ * PUBLIC VARIABLES
  ****************************************************************************
  */
 

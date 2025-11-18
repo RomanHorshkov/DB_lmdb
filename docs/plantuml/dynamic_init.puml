@@ -38,7 +38,7 @@ Core --> API : DB->env ready
 
 API -> DBI : db_lmdb_dbi_init(decls, n_dbis)
 DBI -> Core : db_lmdb_txn_begin_safe(DB->env)
-loop for each dbi_decl_t
+loop for each dbi_init_t
     DBI -> Core : db_lmdb_dbi_open_safe(txn, name, flags)
     DBI -> Core : db_lmdb_dbi_get_flags_safe(txn, dbi)
     DBI --> DBI : cache dbi_desc_t (flags, names)

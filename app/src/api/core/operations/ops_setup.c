@@ -1,19 +1,12 @@
 
-
-#include "common.h"    /* EMlog, config */
-
-#include "db.h"        /* DB, DBI, lmdb */
-#include "ops_creat.h" /* DB_operation_t etc */
-#include "security.h"  /* security_check */
-
-#include <lmdb.h>
+#include "ops_setup.h" /* DB_operation_t etc */
 
 /************************************************************************
  * PRIVATE DEFINES
  ****************************************************************************
  */
 
-#define LOG_TAG "ops_cre"
+#define LOG_TAG "ops_setup"
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -220,7 +213,7 @@ db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi
                                       int* const out_err);
 
 /****************************************************************************
- * PRIVATE FUNCTIONS DEFINITIONS
+ * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
@@ -269,6 +262,8 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const size_t db
                                     const char* const path, const unsigned int mode,
                                     int* const out_err)
 {
+    /* Do NOT allow retry at initialization */
+
     /* Create environment */
     switch(_db_create_env(out_err))
     {
@@ -364,10 +359,9 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
 }
 
 /****************************************************************************
- * PUBLIC FUNCTIONS DEFINITIONS
+ * PRIVATE FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
 db_security_ret_code_t _db_create_env(int* const out_err)
 {
     /* Check database existence */

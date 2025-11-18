@@ -12,6 +12,16 @@
         "common.h": "c",
         "security.h": "c",
         "initializer_list": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "db_lmdb.h": "c",
+        "config.h": "c",
+        "emlog.h": "c",
+        "errno.h": "c",
+        "types.h": "c",
+        "ops_exec.h": "c",
+        "ops_setup.h": "c",
+        "db.h": "c",
+        "core.h": "c",
+        "dbi.h": "c"
     }
 }

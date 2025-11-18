@@ -11,7 +11,7 @@
 #define DB_LMDB_INTERNAL_H
 
 #include "config.h" /* config file */
-#include "emlog.h"  /* EML_ERROR etc */
+#include "emlog.h"  /* EML_ERROR etc, errno, stdint, stddef, sys/types  */
 
 #ifdef __cplusplus
 extern "C"

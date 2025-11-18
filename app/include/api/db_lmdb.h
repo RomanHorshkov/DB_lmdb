@@ -8,7 +8,7 @@
  *
  * The implementation hides LMDB internals and provides a higher-level
  * initialization convenience that accepts an array of DB declarations
- * (`dbi_decl_t`) describing the named sub-databases to create/open.
+ * (`dbi_init_t`) describing the named sub-databases to create/open.
  */
 
 #ifndef DB_LMDB_H
@@ -17,7 +17,7 @@
 #include <stddef.h> /* size_t */
 #include <stdint.h> /* uintxx_t */
 
-// #include "db_lmdb_dbi.h" /* dbi_decl_t */
+// #include "db_lmdb_dbi.h" /* dbi_init_t */
 
 #ifdef __cplusplus
 extern "C"
@@ -35,13 +35,13 @@ extern "C"
  * This function creates and configures the LMDB environment, sets up any
  * required directories under @p meta_dir, and opens each named database
  * described by the @p dbis array. Each entry in @p dbis is a transient
- * descriptor (see `dbi_decl_t`) that describes the logical name and type.
+ * descriptor (see `dbi_init_t`) that describes the logical name and type.
  *
  * The caller retains ownership of the memory backing @p dbis; this function
  * only reads the strings during initialization. The implementation will
  * cache the MDB_dbi handles internally for subsequent operations.
  *
- * @param dbis      Pointer to an array of `dbi_decl_t` describing each
+ * @param dbis      Pointer to an array of `dbi_init_t` describing each
  *                  named database to open (must be non-NULL).
  * @param n_dbis    Number of entries in @p dbis (must be > 0).
  * @param meta_dir  Filesystem path to the LMDB environment directory where
@@ -55,7 +55,7 @@ extern "C"
  *         or EACCES for filesystem-related errors, or other errno codes
  *         propagated from LMDB initialization.
  */
-int db_lmdb_init(const dbi_decl_t* dbis, uint8_t n_dbis, const char* meta_dir);
+int db_lmdb_init(const dbi_init_t* dbis, uint8_t n_dbis, const char* meta_dir);
 
 /**
  * @brief Retrieve basic LMDB environment metrics.

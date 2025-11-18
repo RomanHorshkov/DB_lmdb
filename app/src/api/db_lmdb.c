@@ -33,7 +33,7 @@
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-int db_lmdb_init(const dbi_decl_t* dbi_decls, size_t n_dbis, const char* meta_dir)
+int db_lmdb_init(const dbi_init_t* dbi_decls, size_t n_dbis, const char* meta_dir)
 {
     if(DataBase)
     {

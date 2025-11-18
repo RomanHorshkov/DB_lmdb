@@ -1,6 +1,47 @@
 /**
  * @file security.c
- * @brief Centralized LMDB return-code policy and retry/resize guidance.
+ * @brief Centralized LMDB -> errno policy and transaction retry guidance.
+ *
+ * @details
+ * This module centralizes the handling of LMDB (mdb) return codes and
+ * converts them into the project's `db_security_ret_code_t` policy answers
+ * (safe/ retry / fail) and a POSIX-style `errno` mapping when requested.
+ *
+ * Responsibilities:
+ * - Map LMDB errors to POSIX `errno` (see `_map_mdb_err_to_errno`).
+ * - Decide whether an LMDB error should cause the caller to retry the
+ *   operation, expand the environment map size (when appropriate), or fail
+ *   the operation permanently (`security_check`).
+ * - Attempt a mapsize expansion in a safe manner when `MDB_MAP_FULL`
+ *   is encountered (`_expand_env_mapsize`).
+ *
+ * Notes & guarantees:
+ * - `security_check` will abort the supplied `MDB_txn *txn` when the
+ *   LMDB error requires transaction invalidation (for example: map full,
+ *   corruption, or other fatal conditions). Callers should not attempt to
+ *   reuse a transaction after it has been aborted here.
+ * - `_expand_env_mapsize` must be called with no open transactions that
+ *   use the environment (this function itself checks `DataBase`/`env`).
+ * - The code attempts to double the current map size up to the configured
+ *   maximum and returns LMDB style result codes on failure so callers may
+ *   inspect LMDB's detailed cause when present.
+ *
+ * Thread-safety:
+ * - The underlying LMDB environment functions are responsible for
+ *   concurrency; this module does not enforce additional locking. If the
+ *   embedding application requires serialized mapsize changes, it must
+ *   provide that coordination.
+ *
+ * Usage example:
+ * @code
+ * int err_no;
+ * db_security_ret_code_t safety = security_check(mdb_rc, txn, &err_no);
+ * switch (safety) {
+ * case DB_SAFETY_OK:    // success, continue
+ * case DB_SAFETY_RETRY: // caller should retry the operation
+ * case DB_SAFETY_FAIL:  // terminal failure, propagate error
+ * }
+ * @endcode
  */
 
 #include "security.h"
@@ -35,26 +76,52 @@
  */
 
 /**
- * @brief Map LMDB error code to errno.
+ * @brief Convert an LMDB return code to a POSIX-style `errno` value.
  *
- * @param rc LMDB return code.
- * @return Mapped errno value.
+ * @details
+ * The mapping is selected to best express the semantic meaning of each
+ * LMDB error using standard POSIX errno codes. For unmapped/unknown LMDB
+ * return codes this function returns `-rc` to allow callers to observe the
+ * original LMDB numeric value.
+ *
+ * @param rc LMDB return code (one of the MDB_* constants from lmdb.h).
+ * @return A negative errno value (e.g. -ENOENT) for mapped errors, 0 on
+ *         success (when `rc == MDB_SUCCESS`) or `-rc` for unknown LMDB values
+ *         so callers still have the original numeric rc available as a
+ *         negative error.
+ *
+ * @note This function intentionally returns negative `errno` values so they
+ *       can be returned directly from functions which use the `-errno`
+ *       convention. Callers that expect the positive `errno` should negate
+ *       the return value.
  */
 int _map_mdb_err_to_errno(int rc);
 
 /**
- * @brief Expand LMDB environment map size by DB_ENV_MAPSIZE_EXPAND_STEP bytes.
- * 
- * @return 0 on success, negative error code otherwise.
+ * @brief Attempt to expand the LMDB environment's map size.
+ *
+ * @details
+ * This helper doubles the current `DataBase->map_size_bytes` up to the
+ * configured maximum `DataBase->map_size_bytes_max`. It uses
+ * `mdb_env_set_mapsize()` to request the new mapsize and updates the in-
+ * process `DataBase` bookkeeping on success.
+ *
+ * @pre There must be no active LMDB transactions that might be using the
+ *      environment while this function is called. The caller is responsible
+ *      for ensuring that precondition.
+ *
+ * @return MDB_SUCCESS (0) on success. On failure, returns the LMDB error
+ *         code returned by `mdb_env_set_mapsize()` (positive LMDB rc), or a
+ *         negative POSIX-style code when `DataBase`/`env` is invalid.
  */
-int db_env_mapsize_expand(void);
+int _expand_env_mapsize(void);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
-db_security_ret_code_t security_check(const int mdb_rc, int* const out_errno)
+db_security_ret_code_t security_check(const int mdb_rc, MDB_txn* txn, int* const out_errno)
 {
     /* Fast path */
     if(mdb_rc == MDB_SUCCESS) return DB_SAFETY_OK;
@@ -72,16 +139,35 @@ db_security_ret_code_t security_check(const int mdb_rc, int* const out_errno)
         case MDB_CURSOR_FULL:
         case MDB_BAD_RSLOT:
         case MDB_READERS_FULL:
-            return DB_SAFETY_RETRY;
-        case MDB_MAP_FULL: /* Need memory expansion */
-            if(db_env_mapsize_expand() == 0) return DB_SAFETY_RETRY;
-            EML_ERROR(LOG_TAG, "security_check: mapsize_expand failed");
-            return DB_SAFETY_FAIL;
+        case MDB_MAP_FULL:
+            /* Here the transaction has to be aborted */
+            if(txn) mdb_txn_abort(txn);
+            /* Check if need to resize */
+            if(mdb_rc == MDB_MAP_FULL)
+            {
+                /* resize */
+                int expand = _expand_env_mapsize();
+                if(expand == 0)
+                {
+                    EML_INFO(LOG_TAG, "_check: mapsize expanded on MDB_MAP_FULL");
+                    return DB_SAFETY_RETRY;
+                }
 
-        /* Failure Cases */
+                EML_ERROR(LOG_TAG, "_check: mapsize expand failed, lmdb_ret=%d", expand);
+                return DB_SAFETY_FAIL;
+            }
+
+            return DB_SAFETY_RETRY;
+
+        /* Logic failures which do not invalidate the transaction */
         case MDB_NOTFOUND:
         case MDB_KEYEXIST:
+            return DB_SAFETY_FAIL;
+
+        /* Anything else just invalidate */
         default:
+            EML_ERROR(LOG_TAG, "_check: unknown lmdb error %d", mdb_rc);
+            if(txn) mdb_txn_abort(txn);
             return DB_SAFETY_FAIL;
     }
 }
@@ -140,15 +226,31 @@ int _map_mdb_err_to_errno(int rc)
     }
 }
 
-int db_env_mapsize_expand(void)
+int _expand_env_mapsize(void)
 {
-    if(!(DB && DB->env)) return -EIO;
-    uint64_t desired = DB->map_size_bytes * 2;
-    if(desired > DB->map_size_bytes_max)
+    /* Check database min health */
+    if(!(DataBase && DataBase->env)) return -EIO;
+
+    /* Double current map size */
+    size_t desired = DataBase->map_size_bytes * 2;
+
+    /* Check against max, allow equal */
+    if(desired > DataBase->map_size_bytes_max)
     {
-        EML_WARN(LOG_TAG, "db_env_mapsize_expand: desired size %zu exceeds max %zu",
-                 (size_t)desired, DB->map_size_bytes_max);
-        return -ENOSPC;
+        EML_ERROR(LOG_TAG, "_expand_env_mapsize: desired size %zu exceeds max %zu", desired,
+                  DataBase->map_size_bytes_max);
+        return MDB_MAP_FULL;
     }
-    return mdb_env_set_mapsize(DB->env, desired);
+
+    int set = mdb_env_set_mapsize(DataBase->env, desired);
+    if(set != MDB_SUCCESS)
+    {
+        EML_ERROR(LOG_TAG, "_expand_env_mapsize: mdb_env_set_mapsize failed %d", set);
+        return set;
+    }
+
+    /* Update DataBase info */
+    DataBase->map_size_bytes = desired;
+
+    return set;
 }

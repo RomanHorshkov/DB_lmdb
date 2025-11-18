@@ -27,12 +27,19 @@
 #ifndef DB_OPERATIONS_H
 #define DB_OPERATIONS_H
 
-#include "void_store.h" /* void_store_t */
+// #include "void_store.h" /* void_store_t */
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+/****************************************************************************
+ * PUBLIC STRUCTURED TYPES
+ ****************************************************************************
+ */
+
+struct void_store_t; /* forward declaration */
 
 /**
  * @defgroup dbops DB Operation Layer
