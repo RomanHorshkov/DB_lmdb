@@ -6,7 +6,7 @@
  ****************************************************************************
  */
 
-#define LOG_TAG "ops_setup"
+#define LOG_TAG "ops_init"
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -216,49 +216,6 @@ db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
-db_security_ret_code_t ops_txn_begin(MDB_txn** out_txn, const unsigned flags, int* const out_err)
-{
-    /* Check input */
-    if(!DataBase || !DataBase->env || !out_txn)
-    {
-        EML_ERROR(LOG_TAG, "_txn_begin: invalid input");
-        return DB_SAFETY_FAIL;
-    }
-
-    /* loosing const correctness */
-    int mdb_res = mdb_txn_begin(DataBase->env, NULL, flags, out_txn);
-
-    /* keep this light check to avoid jumping into 
-    security_check on hot path */
-    if(mdb_res != 0)
-    {
-        EML_ERROR(LOG_TAG, "_txn_begin: mdb_txn_begin failed, mdb_rc=%d", mdb_res);
-        return security_check(mdb_res, NULL, out_err);
-    }
-    return DB_SAFETY_SUCCESS;
-}
-
-db_security_ret_code_t ops_txn_commit(MDB_txn* const txn, int* const out_err)
-{
-    /* Check input */
-    if(!txn)
-    {
-        EML_ERROR(LOG_TAG, "_txn_commit: invalid input (txn=NULL)");
-        return DB_SAFETY_FAIL;
-    }
-
-    int mdb_res = mdb_txn_commit(txn);
-    /* keep this light check to avoid jumping into 
-    security_check on hot path */
-    if(mdb_res != 0)
-    {
-        EML_ERROR(LOG_TAG, "_txn_commit: mdb_txn_commit failed, mdb_rc=%d", mdb_res);
-        return security_check(mdb_res, txn, out_err);
-    }
-    return DB_SAFETY_SUCCESS;
-}
-
 db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
                                     const unsigned int mode, int* const out_err)
 {

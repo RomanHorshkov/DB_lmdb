@@ -26,7 +26,7 @@
 /* max sub-dbis */
 #define DB_MAX_DBIS            16
 
-/* retry amounts */
+/* operation batch retry times */
 #define DB_LMDB_RETRY_OPS_EXEC 3
 
 #endif /* DB_LMDB_CONFIG_H */

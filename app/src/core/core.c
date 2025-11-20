@@ -3,8 +3,7 @@
  */
 
 #include "core.h"
-#include "ops_exec.h"  /* ops_init_env etc */
-#include "ops_setup.h" /* ops_init_dbi etc */
+#include "ops_facade.h"
 
 /************************************************************************
  * PRIVATE DEFINES
@@ -90,7 +89,7 @@ int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* in
     /* Init a transaction */
     MDB_txn* txn = NULL;
 
-    switch(ops_txn_begin(&txn, 0, out_err))
+    switch(act_txn_begin(&txn, 0, out_err))
     {
         case DB_SAFETY_SUCCESS:
             break;
@@ -121,7 +120,7 @@ int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* in
         }
     }
 
-    switch(ops_txn_commit(txn, out_err))
+    switch(act_txn_commit(txn, out_err))
     {
         case DB_SAFETY_SUCCESS:
             break;

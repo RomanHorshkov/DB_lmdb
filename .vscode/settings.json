@@ -25,6 +25,7 @@
         "dbi.h": "c",
         "type_traits": "c",
         "utility": "c",
-        "dbi_int.h": "c"
+        "dbi_int.h": "c",
+        "ops_internals.h": "c"
     }
 }

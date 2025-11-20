@@ -1,17 +1,10 @@
 /**
  * @file db_operations.c
- * @brief 
- *
- * @author  Roman Horshkov <roman.horshkov@gmail.com>
- * @date    2025
- * (c) 2025
+ * 
  */
 
-#include "ops_exec.h"    /* op_t etc */
-#include "ops_actions.h" /* ops_init_dbi etc */
-// #include "ops_setup.h"  /* dbi_init_t */
-
-#include "void_store.h" /* void_store_t etc */
+#include "ops_exec.h"
+#include "ops_actions.h"
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -27,18 +20,18 @@
  */
 typedef enum
 {
-    OP_KIND_RO  = 0, /**< Read operation (GET). */
-    OP_KIND_RW = 1  /**< Write operation (PUT/DEL). */
-} op_kind_t;
+    OPS_BATCH_KIND_RO  = 0, /**< Read operation (GET). */
+    OPS_BATCH_KIND_RW = 1  /**< Write operation (PUT/DEL). */
+} batch_kind_t;
 
 typedef struct
 {
-    op_kind_t    kind;                /**< Operation kind. */
-    op_t         ops[OPS_CACHE_SIZE]; /**< Cached operations. */
-    unsigned int n_ops;               /**< Number of cached operations. */
-} op_batch_t;
+    batch_kind_t    kind;                /**< Operations batch kind. */
+    op_t    ops[OPS_CACHE_SIZE]; /**< Cached operations. */
+    size_t n_ops;               /**< Number of cached operations. */
+} batch_t;
 
-op_batch_t ops_cache;
+batch_t ops_cache;
 
 /****************************************************************************
  * PRIVATE VARIABLES
@@ -53,15 +46,15 @@ op_batch_t ops_cache;
 
 static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_err);
 
-static inline op_kind_t _op_kind_from_type(const op_type_t* const type)
+static inline batch_kind_t _op_kind_from_type(const op_type_t* const type)
 {
     switch(*type)
     {
         case DB_OPERATION_GET:
         // case DB_OPERATION_LST:
-            return OP_KIND_RO;
+            return OPS_BATCH_KIND_RO;
         default:
-            return OP_KIND_RW; /* safe default */
+            return OPS_BATCH_KIND_RW; /* safe default */
     }
 }
 
@@ -69,7 +62,7 @@ static inline unsigned int _op_kind_from_op(void)
 {
     switch (ops_cache.kind)
     {
-    case OP_KIND_RO:
+    case OPS_BATCH_KIND_RO:
         return MDB_RDONLY;
     
     default:
@@ -82,16 +75,15 @@ static inline unsigned int _op_kind_from_op(void)
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
 int ops_add_operation(const op_t* operation)
 {
     /* Input check */
 
     /* Check if write op */
-    if(ops_cache.kind != OP_KIND_RW && _op_kind_from_type(operation->type) == OP_KIND_RW)
+    if(ops_cache.kind != OPS_BATCH_KIND_RW && _op_kind_from_type(operation->type) == OPS_BATCH_KIND_RW)
     {
         /* Set whole ops batch to write */
-        ops_cache.kind = OP_KIND_RW;
+        ops_cache.kind = OPS_BATCH_KIND_RW;
     }
 
     /**
@@ -151,7 +143,7 @@ retry:
     /* Increase retry count */
     retry_count++;
     /* Begin transaction with correct flags */
-    switch(ops_txn_begin(&txn, txn_open_flags, &res))
+    switch(act_txn_begin(&txn, txn_open_flags, &res))
     {
         case DB_SAFETY_SUCCESS:
             break;
@@ -186,7 +178,7 @@ retry:
     
     default:
         /* Commit transaction */
-        switch(ops_txn_commit(txn, &res))
+        switch(act_txn_commit(txn, &res))
         {
             case DB_SAFETY_SUCCESS:
                 break;
@@ -207,7 +199,7 @@ done:
 
 fail:
     /* wipe the cache */
-    memset(ops_cache, 0, sizeof(op_batch_t));
+    memset(ops_cache, 0, sizeof(batch_t));
     return res;
 }
 
@@ -242,10 +234,10 @@ static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_er
     switch((unsigned int)op->type)
     {
         case DB_OPERATION_PUT:
-            return op_put(txn, op, out_err);
+            return act_put(txn, op, out_err);
 
         case DB_OPERATION_GET:
-            return op_get(txn, op, out_err);
+            return act_get(txn, op, out_err);
 
         // case DB_OPERATION_REP:
         //     return _op_rep(txn, op);

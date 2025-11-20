@@ -8,7 +8,10 @@
 
 #include "dbi_ext.h" /* dbi_type_t */
 
-#include "ops_setup.h" /* op_key_t, op_val_t */
+#include "ops_actions.h"
+#include "ops_exec.h"
+#include "ops_init.h"
+
 
 #ifdef __cplusplus
 extern "C"
