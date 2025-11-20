@@ -55,7 +55,10 @@ DataBase_t* DataBase = NULL;
  ****************************************************************************
  */
 
-int db_core_init(const char* const path, const unsigned int mode,
+int 
+
+
+db_core_init(const char* const path, const unsigned int mode,
                  const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {

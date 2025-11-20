@@ -57,4 +57,24 @@
 db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
                                     const unsigned int mode, int* const out_err);
 
+/**
+ * @brief Open a sub-database (DBI) within the environment.
+ * 
+ * @details
+ * This function opens (or creates if missing) a named sub-database (DBI)
+ * within the LMDB environment using the provided transaction. The DBI is
+ * identified by its name and index, and is configured according to the
+ * specified type.
+ * 
+ * @param[in]  txn       Active LMDB transaction.
+ * @param[in]  name      Name of the sub-database to open.
+ * @param[in]  dbi_idx   Index of the DBI to open (must be < DataBase->n_dbis).
+ * @param[in]  dbi_type  Type of the DBI (see dbi_type_t).
+ * @param[out] out_err   Optional pointer to receive a negative errno or
+ *                       LMDB code on failure (NULL to ignore).
+ */
+db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
+                                    unsigned int dbi_idx, dbi_type_t dbi_type, int* const out_err);
+
+
 #endif /* DB_OPERATIONS_OPS_SETUP_H_ */

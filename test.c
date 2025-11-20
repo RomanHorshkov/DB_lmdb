@@ -4,7 +4,7 @@
 #include <sys/types.h>
 
 #include "emlog.h"
-#include "db_lmdb_core.h"
+#include "core/core.h"
 
 int main(void)
 {
@@ -21,7 +21,7 @@ int main(void)
     }
 
     /* Describe a single default DBI via simple arrays. */
-    const char*      dbi_names[]  = { "demo" };
+    const char*      dbi_names[]  = { "demo_dbi" };
     const dbi_type_t dbi_types[]  = { DBI_TYPE_DEFAULT };
 
     int rc = db_core_init(db_path, 0600u, dbi_names, dbi_types, 1);
