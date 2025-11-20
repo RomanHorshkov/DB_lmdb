@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.18)
 
 project(db_lmdb LANGUAGES C)
 
+# Export compile_commands.json so IDEs (e.g. VS Code)
+# can pick up proper include paths and flags.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # ---------------------------------------------------------------------------
 # External logging library: EMlog
 # Build this first so the rest of the project can link against libemlog.so.

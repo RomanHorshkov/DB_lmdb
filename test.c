@@ -4,7 +4,7 @@
 #include <sys/types.h>
 
 #include "emlog.h"
-#include "core/core.h"
+#include "core.h"
 
 int main(void)
 {
@@ -30,6 +30,10 @@ int main(void)
         fprintf(stderr, "db_core_init failed: %d\n", rc);
         return 1;
     }
+
+    rc = db_core_add_op(0, DB_OPERATION_PUT,
+                         (const void*)"sample_key", sizeof("sample_key"),
+                         (const void*)"sample_value", sizeof("sample_value"));
 
     /* For now just init + shutdown; ops wiring will come next. */
     size_t final_mapsize = db_core_shutdown();

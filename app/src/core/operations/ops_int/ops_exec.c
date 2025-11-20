@@ -136,6 +136,9 @@ int ops_execute_operations(void)
     /* Determine transaction flags */
     unsigned int txn_open_flags = _op_kind_from_op();
 
+    EML_DBG(LOG_TAG, "ops_execute_operations: starting batch of %zu ops (kind=%d)",
+            ops_cache.n_ops, (int)ops_cache.kind);
+
     /* Init transaction */
     MDB_txn* txn = NULL;
 retry:
@@ -232,6 +235,7 @@ static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err)
                 EML_ERROR(LOG_TAG, "_exec_ops: op %u failed", i);
                 return DB_SAFETY_FAIL;
         }
+        EML_DBG(LOG_TAG, "_exec_ops: op %u executed successfully", i);
     }
 
     return DB_SAFETY_SUCCESS;

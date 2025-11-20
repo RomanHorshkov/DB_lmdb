@@ -2,3 +2,6 @@
 void_store_hold/
 build/
 demo_db/
+docs/plantuml/generated/
+docs/plantuml/puml/*.png
+docs/plantuml/puml/*.svg
