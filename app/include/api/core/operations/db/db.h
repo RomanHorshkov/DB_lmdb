@@ -6,7 +6,13 @@
 #ifndef DB_LMDB_DB_H
 #define DB_LMDB_DB_H
 
-#include "dbi.h" /* dbi_desc_t, dbi_init_t, and everything else */
+#include "dbi_int.h" /* dbi_desc_t, dbi_init_t... */
+#include "lmdb.h"   /* MDB_env, MDB_dbi */
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 /****************************************************************************
  * PUBLIC DEFINES
@@ -26,7 +32,7 @@ typedef struct
 {
     MDB_env* env;                /* LMDB environment */
     dbi_t*   dbis;               /* array of DBI descriptors */
-    uint8_t  n_dbis;             /* number of DBIs in array */
+    size_t   n_dbis;             /* number of DBIs in array */
     size_t   map_size_bytes_max; /* maximum map size */
 } DataBase_t;
 
@@ -36,7 +42,7 @@ typedef struct
  */
 
 /* Global DB handle */
-DataBase_t* DataBase = NULL;
+DataBase_t* DataBase;
 
 /****************************************************************************
  * PUBLIC VARIABLES 
@@ -77,5 +83,10 @@ DataBase_t* DataBase = NULL;
 // /* ACL DBIs */
 // MDB_dbi db_acl_fwd; /* key=principal(16)|rtype(1)|data(16), val=uint8_t(1) */
 // MDB_dbi db_acl_rel; /* key=data(16)|rtype(1), val=principal(16) (dupsort, dupfixed) */
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* DB_LMDB_DB_H */
