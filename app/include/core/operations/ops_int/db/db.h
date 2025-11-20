@@ -7,7 +7,7 @@
 #define DB_LMDB_DB_H
 
 #include "dbi_int.h" /* dbi_desc_t, dbi_init_t... */
-#include "lmdb.h"   /* MDB_env, MDB_dbi */
+#include "lmdb.h"    /* MDB_env, MDB_dbi */
 
 #ifdef __cplusplus
 extern "C"
@@ -83,7 +83,6 @@ extern DataBase_t* DataBase;
 // /* ACL DBIs */
 // MDB_dbi db_acl_fwd; /* key=principal(16)|rtype(1)|data(16), val=uint8_t(1) */
 // MDB_dbi db_acl_rel; /* key=data(16)|rtype(1), val=principal(16) (dupsort, dupfixed) */
-
 
 #ifdef __cplusplus
 }

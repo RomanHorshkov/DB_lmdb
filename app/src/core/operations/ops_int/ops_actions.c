@@ -1,7 +1,7 @@
 
-#include <stddef.h>      /* NULL */
 #include "ops_actions.h"
-#include "common.h"      /* EML_* macros, LMDB_EML_* */
+#include <stddef.h> /* NULL */
+#include "common.h" /* EML_* macros, LMDB_EML_* */
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -58,11 +58,20 @@ static inline MDB_val* _get_key(op_t* op)
 {
     return _resolve_desc(op, &op->key);
 }
+
+/**
+ * @brief Resolve the value for an operation.
+ *
+ * Thin wrapper over _resolve_desc that binds the descriptor to op->val.
+ */
+static inline MDB_val* _get_val(op_t* op)
+{
+    return _resolve_desc(op, &op->val);
+}
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
-
 
 db_security_ret_code_t act_txn_begin(MDB_txn** out_txn, const unsigned flags, int* const out_err)
 {
@@ -126,7 +135,7 @@ db_security_ret_code_t act_put(MDB_txn* txn, op_t* op, int* const out_err)
     }
 
     /* Get val pointer */
-    MDB_val* v_ptr = _get_key(op);
+    MDB_val* v_ptr = _get_val(op);
     if(!v_ptr)
     {
         EML_ERROR(LOG_TAG, "_op_get: failed to retrieve val");
@@ -139,9 +148,8 @@ db_security_ret_code_t act_put(MDB_txn* txn, op_t* op, int* const out_err)
     /* DO NOT add MDB_RESERVE here */
     /* Use the put flags in the Database */
     int mdb_res = mdb_put(txn, dbi->dbi, k_ptr, v_ptr, dbi->put_flags);
-    if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, NULL);
+    if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, out_err);
     return DB_SAFETY_SUCCESS;
-
 }
 
 db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
@@ -161,9 +169,9 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
         return DB_SAFETY_FAIL;
     }
 
-    /* Get val */
-    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val);
-    if(mdb_res != 0) return security_check(mdb_res, txn, NULL);
+    /* Get val: use op->val.present which is layout-compatible with MDB_val. */
+    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val.present);
+    if(mdb_res != 0) return security_check(mdb_res, txn, out_err);
     return DB_SAFETY_SUCCESS;
 }
 

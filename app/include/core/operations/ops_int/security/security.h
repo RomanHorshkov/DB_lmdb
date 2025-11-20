@@ -26,9 +26,9 @@ typedef struct MDB_txn MDB_txn;
 */
 typedef enum
 {
-    DB_SAFETY_SUCCESS    = 0, /* proceed */
-    DB_SAFETY_RETRY = 3, /* retry */
-    DB_SAFETY_FAIL  = 7  /* fail */
+    DB_SAFETY_SUCCESS = 0, /* proceed */
+    DB_SAFETY_RETRY   = 3, /* retry */
+    DB_SAFETY_FAIL    = 7  /* fail */
 } db_security_ret_code_t;
 
 /************************************************************************

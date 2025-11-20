@@ -9,8 +9,8 @@
 #ifndef DB_LMDB_CORE_H
 #define DB_LMDB_CORE_H
 
-#include <stddef.h>           /* size_t */
-#include "dbi_ext.h"          /* dbi_type_t */
+#include <stddef.h>                /* size_t */
+#include "dbi_ext.h"               /* dbi_type_t */
 #include "operations/ops_facade.h" /* op_type_t */
 
 #ifdef __cplusplus
@@ -52,9 +52,8 @@ extern "C"
  * @param n_dbis     Number of entries in the @p init_dbis array.
  * @return 0 on success; negative POSIX-style errno on failure.
  */
-int db_core_init(const char* const path, const unsigned int mode,
-                 const char* const* dbi_names, const dbi_type_t* dbi_types,
-                 unsigned n_dbis);
+int db_core_init(const char* const path, const unsigned int mode, const char* const* dbi_names,
+                 const dbi_type_t* dbi_types, unsigned n_dbis);
 
 /**
  * @brief Queue a single database operation into the current batch.
@@ -77,8 +76,7 @@ int db_core_init(const char* const path, const unsigned int mode,
  * @param val_size Size of value buffer in bytes (for PUT).
  * @return 0 on success, negative errno-style code on failure.
  */
-int db_core_add_op(unsigned dbi_idx, op_type_t type,
-                   const void* key_data, size_t key_size,
+int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_t key_size,
                    const void* val_data, size_t val_size);
 
 /**

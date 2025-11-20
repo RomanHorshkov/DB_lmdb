@@ -21,7 +21,6 @@
 #include "db.h"
 #include "security.h" /* expose security policy and helpers */
 
-
 /****************************************************************************
  * PUBLIC FUNCTIONS PROTOTYPES
  ****************************************************************************
@@ -75,6 +74,5 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
  */
 db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
                                     unsigned int dbi_idx, dbi_type_t dbi_type, int* const out_err);
-
 
 #endif /* DB_OPERATIONS_OPS_SETUP_H_ */

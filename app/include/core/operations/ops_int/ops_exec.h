@@ -28,7 +28,6 @@ int ops_add_operation(const op_t* operation);
 
 int ops_execute_operations(void);
 
-
 static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err);
 
 #ifdef __cplusplus

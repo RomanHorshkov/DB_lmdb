@@ -6,10 +6,9 @@
 #define DB_OPERATIONS_OPS_INTERNALS_H_
 
 #include <stddef.h>   /* size_t */
+#include "db.h"       /* MDB_txn etc */
 #include "ops_facade.h"
 #include "security.h" /* db_security_ret_code_t */
-#include "db.h"       /* MDB_txn etc */
-
 
 #ifdef __cplusplus
 extern "C"
@@ -84,8 +83,8 @@ typedef struct
 
     union
     {
-        op_val_t present;             /**< Present key info. */
-        op_val_lookup_t lookup;      /**< Lookup key info. */
+        op_val_t        present; /**< Present key info. */
+        op_val_lookup_t lookup;  /**< Lookup key info. */
     };
 
 } op_key_t;
@@ -102,7 +101,6 @@ typedef struct
  * PRIVATE FUNCTION PROTOTYPES
  ****************************************************************************
  */
-
 
 #ifdef __cplusplus
 }

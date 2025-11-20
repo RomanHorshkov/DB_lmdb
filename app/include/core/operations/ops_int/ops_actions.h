@@ -18,7 +18,6 @@ extern "C"
  ****************************************************************************
  */
 
-
 /**
  * @brief Allocate and begin a new LMDB transaction using the safety policy.
  *

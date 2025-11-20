@@ -2,19 +2,19 @@
  * @file db_lmdb_core.c
  */
 
-#include <errno.h>       /* EINVAL, ENOMEM, EALREADY */
-#include <stdint.h>      /* uint8_t */
-#include <stdlib.h>      /* calloc, free */
+#include <errno.h>         /* EINVAL, ENOMEM, EALREADY */
+#include <stdint.h>        /* uint8_t */
+#include <stdlib.h>        /* calloc, free */
 
-#include "core.h"
 #include "common.h"        /* EML_* macros, LMDB_EML_* */
+#include "core.h"
 #include "db.h"            /* DataBase_t, MDB_envinfo */
 #include "dbi_int.h"       /* dbi_t */
-#include "ops_init.h"      /* ops_init_env, ops_init_dbi */
 #include "ops_actions.h"   /* act_txn_begin, act_txn_commit */
 #include "ops_exec.h"      /* ops_add_operation, ops_execute_operations */
-#include "ops_internals.h" /* op_t, op_key_t, op_type_t */
 #include "ops_facade.h"    /* DB_OPERATION_* */
+#include "ops_init.h"      /* ops_init_env, ops_init_dbi */
+#include "ops_internals.h" /* op_t, op_key_t, op_type_t */
 
 /* Definition of the global DB handle declared in db.h */
 DataBase_t* DataBase = NULL;
@@ -62,9 +62,6 @@ db_core_init(const char* const path, const unsigned int mode,
                  const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {
-    EML_INFO(LOG_TAG, "_init_db: starting init (path=%s, mode=%o, n_dbis=%u)",
-             path ? path : "(null)", mode, n_dbis);
-
     if(DataBase)
     {
         EML_ERROR(LOG_TAG, "_db_init: database already initialized");
@@ -134,7 +131,7 @@ db_core_init(const char* const path, const unsigned int mode,
     /* Initialize all requested DBIs */
     for(unsigned i = 0; i < n_dbis; ++i)
     {
-        const char*     name = dbi_names[i];
+        const char*      name = dbi_names[i];
         const dbi_type_t type = dbi_types[i];
 
         if(!name || !(*name))
@@ -173,8 +170,7 @@ fail:
     return out_err_val;
 }
 
-int db_core_add_op(unsigned dbi_idx, op_type_t type,
-                   const void* key_data, size_t key_size,
+int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_t key_size,
                    const void* val_data, size_t val_size)
 {
     /* Validate global DB and DBI index */
@@ -200,7 +196,7 @@ int db_core_add_op(unsigned dbi_idx, op_type_t type,
     }
 
     /* Build op_key_t descriptors */
-    op_key_t key_desc = {0};
+    op_key_t key_desc     = {0};
     key_desc.kind         = OP_KEY_KIND_PRESENT;
     key_desc.present.size = key_size;
     key_desc.present.ptr  = (void*)key_data; /* safe: ops layer treats as read-only */
@@ -225,8 +221,7 @@ int db_core_add_op(unsigned dbi_idx, op_type_t type,
     op.key  = key_desc;
     op.val  = val_desc;
 
-    EML_DBG(LOG_TAG,
-            "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
+    EML_DBG(LOG_TAG, "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
             dbi_idx, (int)type, key_size, val_size);
 
     return ops_add_operation(&op);

@@ -1,8 +1,13 @@
+/**
+ * @file dbi_int.c
+ * @brief Internal DBI helper functions.
+ */
+
 #include "dbi_int.h"
 
 #include "lmdb.h"
 
-unsigned dbi_open_flags_from_type(dbi_type_t type)
+unsigned int dbi_open_flags_from_type(dbi_type_t type)
 {
     unsigned flags = MDB_CREATE;
 
@@ -12,10 +17,12 @@ unsigned dbi_open_flags_from_type(dbi_type_t type)
     return flags;
 }
 
-unsigned dbi_desc_default_put_flags(unsigned db_flags)
+unsigned int dbi_put_flags_from_type(dbi_type_t type)
 {
-    (void)db_flags;
-    /* For now use no extra put flags; callers may refine this later. */
+    if(type & DBI_TYPE_NOOVERWRITE)
+    {
+        return MDB_NOOVERWRITE;
+    }
+
     return 0U;
 }
-

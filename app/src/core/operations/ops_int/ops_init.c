@@ -1,7 +1,7 @@
 
-#include <errno.h>     /* EINVAL etc */
-#include "ops_init.h"  /* env/DBI init helpers */
-#include "common.h"    /* EML_* macros, LMDB_EML_* */
+#include "ops_init.h" /* env/DBI init helpers */
+#include <errno.h>    /* EINVAL etc */
+#include "common.h"   /* EML_* macros, LMDB_EML_* */
 
 /************************************************************************
  * PRIVATE DEFINES
@@ -316,15 +316,14 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     // /* derive open flags */
     // dbi->open_flags = open_flags;
 
-    /* derive put flags */
-    dbi->put_flags = dbi_desc_default_put_flags(dbi->db_flags);
+    /* derive put flags from logical type (e.g., NOOVERWRITE) */
+    dbi->put_flags = dbi_put_flags_from_type(dbi_type);
 
     /* derive dupfix and dupsort flags */
     dbi->is_dupsort  = (dbi->db_flags & MDB_DUPSORT) != 0;
     dbi->is_dupfixed = (dbi->db_flags & MDB_DUPFIXED) != 0;
 
-    EML_INFO(LOG_TAG,
-             "ops_init_dbi: DBI[%u] \"%s\" ready (db_flags=0x%x dupsort=%u dupfixed=%u)",
+    EML_INFO(LOG_TAG, "ops_init_dbi: DBI[%u] \"%s\" ready (db_flags=0x%x dupsort=%u dupfixed=%u)",
              dbi_idx, name, dbi->db_flags, dbi->is_dupsort, dbi->is_dupfixed);
 
     return DB_SAFETY_SUCCESS;

@@ -37,17 +37,28 @@ typedef struct
     unsigned     put_flags;   /**< Default flags to OR into mdb_put calls. */
     unsigned     is_dupsort;  /**< Non-zero if DB uses MDB_DUPSORT. */
     unsigned     is_dupfixed; /**< Non-zero if DB uses MDB_DUPFIXED. */
-    // const char*  name;        /**< Logical name (non-owning). */
-    // dbi_type_t type;        /**< Requested logical type (flags). */
-    // unsigned   open_flags;  /**< Flags used at mdb_dbi_open (includes MDB_CREATE). */
 } dbi_t;
 
 /****************************************************************************
  * PUBLIC FUNCTION PROTOTYPES
  ****************************************************************************
 */
-unsigned dbi_open_flags_from_type(dbi_type_t type);
-unsigned dbi_desc_default_put_flags(unsigned db_flags);
+
+/**
+ * @brief Derive LMDB open flags from logical DBI type.
+ *
+ * @param type Logical DBI type.
+ * @return LMDB open flags suitable for mdb_dbi_open.
+ */
+unsigned int dbi_open_flags_from_type(dbi_type_t type);
+
+/**
+ * @brief Derive default mdb_put flags from logical DBI type.
+ *
+ * @param type Logical DBI type.
+ * @return Default mdb_put flags suitable for use with this DBI.
+ */
+unsigned int dbi_put_flags_from_type(dbi_type_t type);
 
 #ifdef __cplusplus
 }
