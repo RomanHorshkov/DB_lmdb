@@ -42,7 +42,7 @@
  ****************************************************************************
  */
 
-int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
+int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
                  unsigned n_dbis)
 {
     if(DataBase)
@@ -71,11 +71,11 @@ int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* in
         return -ENOMEM;
     }
 
-    /* Set map size values */
-    // new_DataBase->map_size_bytes     = (size_t)DB_MAP_SIZE_INIT;
+    /* Set max map size */
     new_DataBase->map_size_bytes_max = (size_t)DB_MAP_SIZE_MAX;
+    
     /* Set the global handle */
-    DataBase                         = new_DataBase;
+    DataBase = new_DataBase;
 
     /* Do not allow retry on init */
     switch(ops_init_env(DB_MAX_DBIS, path, mode, out_err))
@@ -137,17 +137,21 @@ fail:
     return out_err_val;
 }
 
-int core_db_op_add(const unsigned int dbi_idx, const op_type_t op_type, op_key_t key, op_val_t val)
+int db_core_op_add(const unsigned int dbi_idx, const op_type_t op_type, const op_key_t* key, const op_key_t* val)
 {
-    return ops_add_operation(dbi_idx, op_type, key, val);
+    /* Create here an op_t on the fly definition to deep-copy dbi and type,
+    and shallow copy key and val, coming from the caller, who is respondible
+    for the lifetime of the ptrs. */
+    
+    return ops_add_operation(&(op_t){.dbi = dbi_idx, .type = op_type, .key = *key, .val = *val});
 }
 
-int core_db_op_execute(/* TODO params */)
+int core_db_op_exec(/* TODO params */)
 {
-    return 0;
+    return ops_execute_operations();
 }
 
-size_t core_db_shutdown(void)
+size_t db_core_shutdown(void)
 {
     /* No database initialized: idempotent no-op. */
     if(!DataBase) return 0;

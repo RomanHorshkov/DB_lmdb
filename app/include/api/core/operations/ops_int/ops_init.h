@@ -21,19 +21,6 @@
 #include "db.h"
 #include "security.h" /* expose security policy and helpers */
 
-/**
- * @brief Operation kind.
- */
-typedef enum
-{
-    DB_OPERATION_NONE = 0, /**< Uninitialized placeholder. */
-    DB_OPERATION_PUT,      /**< Insert/replace value; honors MDB flags. */
-    DB_OPERATION_GET,      /**< Lookup by key; fills op->dst/op->dst_len. */
-    DB_OPERATION_REP,      /**< In-place patch of existing value (cursor + RESERVE). */
-    DB_OPERATION_LST,      /**< Reserved for future list/scan helpers. */
-    DB_OPERATION_DEL,      /**< Delete by key or (key, dup-value). */
-    DB_OPERATION_MAX
-} op_type_t;
 
 /**
  * @brief Key kind for an operation.
@@ -52,6 +39,12 @@ typedef enum
     OP_KEY_SRC_KEY = 0, /**< key is from some prev operation's key */
     OP_KEY_SRC_VAL = 1  /**< key is from some prev operation's value */
 } op_key_source_t;
+
+typedef struct
+{
+    op_key_source_t src_type; /**< Source type (key or value). */
+    unsigned int    op_index; /**< Index of the operation to source key from. */
+} op_val_lookup_t;
 
 /**
  * @brief Value descriptor for an operation.
@@ -72,25 +65,13 @@ typedef struct
     size_t size; /**< Size of value bytes. */
     void*  ptr;  /**< Pointer to value bytes. */
 } op_val_t;
-// typedef struct MDB_val op_val_t; // equivalent to the structure above.
 
 /**
  * @brief Key descriptor for an operation.
- *
- * Keys can either be provided directly (`OP_KEY_KIND_PRESENT`) via an
- * embedded @ref op_val_t or derived from a previous operation in the
- * same batch (`OP_KEY_KIND_LOOKUP`). In lookup mode the @ref lookup
- * struct encodes:
- *  - @ref op_index: how many positions back in the ops array the
- *                   referenced operation resides.
- *  - @ref src_type: whether the key should be taken from that
- *                   operation's key (`OP_KEY_SRC_KEY`) or value
- *                   (`OP_KEY_SRC_VAL`).
- *
- * When `src_type == OP_KEY_SRC_VAL`, the referenced operation must
- * have a valid, non-NULL @ref op_val_t::ptr and a @ref op_val_t::size
- * greater than zero. The executor will log an error and fail the
- * batch when this precondition is not met.
+ * 
+ * This struct describes how to obtain the key for an operation,
+ * either by providing the bytes directly or by referencing a previous
+ * operation's key or value.
  */
 typedef struct
 {
@@ -99,11 +80,7 @@ typedef struct
     union
     {
         op_val_t present;             /**< Present key info. */
-        struct
-        {
-            unsigned int    op_index; /**< Index of the operation to source key from. */
-            op_key_source_t src_type; /**< Source type (key or value). */
-        } lookup;                     /**< Lookup key info. */
+        op_val_lookup_t lookup;      /**< Lookup key info. */
     };
 
 } op_key_t;

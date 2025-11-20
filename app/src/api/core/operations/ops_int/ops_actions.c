@@ -2,7 +2,30 @@
 
 #include "ops_actions.h" /* ops_init_dbi etc */
 
+
+/****************************************************************************
+ * PRIVATE DEFINES
+ ****************************************************************************
+ */
+
 #define LOG_TAG "ops_act"
+
+/****************************************************************************
+ * PRIVATE STUCTURED VARIABLES
+ ****************************************************************************
+ */
+/* None */
+
+/****************************************************************************
+ * PRIVATE VARIABLES
+ ****************************************************************************
+ */
+/* None */
+
+/****************************************************************************
+ * PRIVATE FUNCTIONS PROTOTYPES
+ ****************************************************************************
+ */
 
 /**
  * @brief Resolve a key/value descriptor to an MDB_val pointer.
@@ -24,6 +47,86 @@
  *             interpreted as “how many positions back from base”.
  * @param desc Descriptor to resolve (key or value).
  */
+static MDB_val* _resolve_desc(op_t* base, op_key_t* desc);
+
+/**
+ * @brief Resolve the key for an operation.
+ *
+ * Thin wrapper over _resolve_desc that binds the descriptor to op->key.
+ */
+static inline MDB_val* _get_key(op_t* op)
+{
+    return _resolve_desc(op, &op->key);
+}
+/****************************************************************************
+ * PUBLIC FUNCTIONS DEFINITIONS
+ ****************************************************************************
+ */
+
+db_security_ret_code_t op_put(MDB_txn* txn, op_t* op, int* const out_err)
+{
+    /* Check input */
+    if(!txn || !op)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: invalid input");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get key pointer */
+    MDB_val* k_ptr = _get_key(op);
+    if(!k_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get val pointer */
+    MDB_val* v_ptr = _get_key(op);
+    if(!v_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve val");
+        return DB_SAFETY_FAIL;
+    }
+
+    dbi_t* dbi = &DataBase->dbis[op->dbi];
+
+    /* Put val */
+    /* DO NOT add MDB_RESERVE here */
+    /* Use the put flags in the Database */
+    int mdb_res = mdb_put(txn, op->dbi, k_ptr, v_ptr, dbi->put_flags);
+    if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, NULL);
+    return DB_SAFETY_SUCCESS;
+
+}
+
+db_security_ret_code_t op_get(MDB_txn* txn, op_t* op, int* const out_err)
+{
+    /* Check input */
+    if(!txn || !op)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: invalid input");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get key pointer */
+    MDB_val* k_ptr = _get_key(op);
+    if(!k_ptr)
+    {
+        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
+        return DB_SAFETY_FAIL;
+    }
+
+    /* Get val */
+    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val);
+    if(mdb_res != 0) return security_check(mdb_res, txn, NULL);
+    return DB_SAFETY_SUCCESS;
+}
+
+/****************************************************************************
+ * PRIVATE FUNCTIONS DEFINITIONS
+ ****************************************************************************
+ */
+
 static MDB_val* _resolve_desc(op_t* base, op_key_t* desc)
 {
     if(!base || !desc)
@@ -91,73 +194,4 @@ static MDB_val* _resolve_desc(op_t* base, op_key_t* desc)
     } /* switch(kind) */
 
     return k_ptr;
-}
-
-/**
- * @brief Resolve the key for an operation.
- *
- * Thin wrapper over _resolve_desc that binds the descriptor to op->key.
- */
-static MDB_val* _get_key(op_t* op)
-{
-    return _resolve_desc(op, &op->key);
-}
-
-db_security_ret_code_t op_get(MDB_txn* txn, op_t* op, int* const out_err)
-{
-    /* Check input */
-    if(!txn || !op)
-    {
-        EML_ERROR(LOG_TAG, "_op_get: invalid input");
-        return DB_SAFETY_FAIL;
-    }
-
-    /* Get key pointer */
-    MDB_val* k_ptr = _get_key(op);
-    if(!k_ptr)
-    {
-        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
-        return DB_SAFETY_FAIL;
-    }
-
-    /* Get val */
-    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val);
-    if(mdb_res != 0) return security_check(mdb_res, txn, NULL);
-    return DB_SAFETY_SUCCESS;
-}
-
-db_security_ret_code_t op_put(MDB_txn* txn, op_t* op, int* const out_err)
-{
-    /* Check input */
-    if(!txn || !op)
-    {
-        EML_ERROR(LOG_TAG, "_op_get: invalid input");
-        return DB_SAFETY_FAIL;
-    }
-
-    /* Get key pointer */
-    MDB_val* k_ptr = _get_key(op);
-    if(!k_ptr)
-    {
-        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve key");
-        return DB_SAFETY_FAIL;
-    }
-
-    /* Get val pointer */
-    MDB_val* v_ptr = _get_key(op);
-    if(!v_ptr)
-    {
-        EML_ERROR(LOG_TAG, "_op_get: failed to retrieve val");
-        return DB_SAFETY_FAIL;
-    }
-
-    dbi_t* dbi = &DataBase->dbis[op->dbi];
-
-    /* Put val */
-    /* DO NOT add MDB_RESERVE here */
-    /* Use the put flags in the Database */
-    int mdb_res = mdb_put(txn, op->dbi, k_ptr, v_ptr, dbi->put_flags);
-    if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, NULL);
-    return DB_SAFETY_SUCCESS;
-
 }

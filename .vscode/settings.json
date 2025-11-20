@@ -24,6 +24,7 @@
         "core.h": "c",
         "dbi.h": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "dbi_int.h": "c"
     }
 }

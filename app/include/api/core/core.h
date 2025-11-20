@@ -9,17 +9,12 @@
 #ifndef DB_LMDB_CORE_H
 #define DB_LMDB_CORE_H
 
-#include "dbi.h" /* dbi_init_t */
+// #include "ops_facade.h" /* op_type_t */
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-
-// forwared declarations
-typedef enum op_type_t  op_type_t;
-typedef struct op_key_t op_key_t;
-typedef struct op_val_t op_val_t;
 
 /****************************************************************************
  * PUBLIC DEFINES
@@ -48,10 +43,10 @@ typedef struct op_val_t op_val_t;
  * @param n_dbis     Number of entries in the @p init_dbis array.
  * @return 0 on success; negative POSIX-style errno on failure.
  */
-int core_db_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
+int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
                  unsigned n_dbis);
 
-int core_db_op_add(const unsigned int dbi_idx, const op_type_t op_type, op_key_t key, op_val_t val);
+int db_core_op_add(const unsigned int dbi_idx, const op_type_t op_type, const op_key_t* key, const op_key_t* val);
 
 int core_db_op_execute(/* TODO params */);
 
@@ -67,7 +62,7 @@ int core_db_op_execute(/* TODO params */);
  *         core layer) at the moment of shutdown. Returns 0 when the
  *         database was not initialized.
  */
-size_t core_db_shutdown(void);
+size_t db_core_shutdown(void);
 
 #ifdef __cplusplus
 }

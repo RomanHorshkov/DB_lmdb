@@ -5,7 +5,7 @@
 #ifndef DB_OPERATIONS_OPS_ACTIONS_H_
 #define DB_OPERATIONS_OPS_ACTIONS_H_
 
-#include "ops_setup.h" /* ops_init_dbi etc */
+// #include "ops_setup.h" /* ops_init_dbi etc */
 
 #ifdef __cplusplus
 extern "C"

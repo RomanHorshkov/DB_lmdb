@@ -47,9 +47,8 @@
 #include "security.h"
 
 #include <errno.h>
-// #include <lmdb.h>   /* ret codes */
 
-#include "db.h" /* DB, DataBase, common, stddef, stdintm  */
+#include "db.h" /* DB, DataBase, common, stddef, stdintm, lmdb  */
 
 /****************************************************************************
  * PRIVATE DEFINES

@@ -27,8 +27,8 @@
  */
 typedef enum
 {
-    OP_KIND_READ  = 0, /**< Read operation (GET). */
-    OP_KIND_WRITE = 1  /**< Write operation (PUT/REP/DEL). */
+    OP_KIND_RO  = 0, /**< Read operation (GET). */
+    OP_KIND_RW = 1  /**< Write operation (PUT/DEL). */
 } op_kind_t;
 
 typedef struct
@@ -51,33 +51,47 @@ op_batch_t ops_cache;
  ****************************************************************************
  */
 
-static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op);
+static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_err);
 
 static inline op_kind_t _op_kind_from_type(const op_type_t* const type)
 {
     switch(*type)
     {
         case DB_OPERATION_GET:
-        case DB_OPERATION_LST:
-            return OP_KIND_READ;
-        // case DB_OPERATION_PUT:
-        // case DB_OPERATION_REP:
-        // case DB_OPERATION_DEL:
+        // case DB_OPERATION_LST:
+            return OP_KIND_RO;
         default:
-            return OP_KIND_WRITE; /* safe default */
+            return OP_KIND_RW; /* safe default */
     }
 }
 
-int ops_add_operation(const unsigned int dbi_idx, const op_type_t op_type, const op_key_t key,
-                      const op_key_t val)
+static inline unsigned int _op_kind_from_op(void)
+{
+    switch (ops_cache.kind)
+    {
+    case OP_KIND_RO:
+        return MDB_RDONLY;
+    
+    default:
+        return 0;
+    }
+}
+
+
+/****************************************************************************
+ * PUBLIC FUNCTIONS DEFINITIONS
+ ****************************************************************************
+ */
+
+int ops_add_operation(const op_t* operation)
 {
     /* Input check */
 
     /* Check if write op */
-    if(ops_cache.kind != OP_KIND_WRITE && _op_kind_from_type(op_type) == OP_KIND_WRITE)
+    if(ops_cache.kind != OP_KIND_RW && _op_kind_from_type(operation->type) == OP_KIND_RW)
     {
         /* Set whole ops batch to write */
-        ops_cache.kind = OP_KIND_WRITE;
+        ops_cache.kind = OP_KIND_RW;
     }
 
     /**
@@ -87,10 +101,10 @@ int ops_add_operation(const unsigned int dbi_idx, const op_type_t op_type, const
      * current ops count (forward and backwards).
      * With this check later can safely access the prev op during exec.
      */
-    if(key.kind == OP_KEY_KIND_LOOKUP && key.lookup.op_index > ops_cache.n_ops)
+    if(operation->key.kind == OP_KEY_KIND_LOOKUP && operation->key.lookup.op_index > ops_cache.n_ops)
     {
         EML_ERROR(LOG_TAG, "ops_add_operation: invalid key lookup index %u (n_ops=%u)",
-                  key.lookup.op_index, ops_cache.n_ops);
+                  operation->key.lookup.op_index, ops_cache.n_ops);
         return -EINVAL;
     }
 
@@ -101,16 +115,13 @@ int ops_add_operation(const unsigned int dbi_idx, const op_type_t op_type, const
         return -ENOMEM;
     }
 
-    op_t* op = &ops_cache.ops[ops_cache.n_ops++];
-    op->dbi  = dbi_idx;
-    op->type = op_type;
-    op->key  = key;
-    op->val  = val;
+    /* shallow struct copy */
+    ops_cache.ops[ops_cache.n_ops++] = *operation;
 
     return 0;
 }
 
-int ops_execute_operations(/* TODO params */)
+int ops_execute_operations(void)
 {
     if(!ops_cache.ops || !ops_cache.n_ops == 0)
     {
@@ -123,11 +134,7 @@ int ops_execute_operations(/* TODO params */)
     int res         = -1;
 
     /* Determine transaction flags */
-    unsigned int txn_open_flags = 0;
-    if(ops_cache.kind == OP_KIND_READ)
-    {
-        txn_open_flags = MDB_RDONLY;
-    }
+    unsigned int txn_open_flags = _op_kind_from_op();
 
     /* Init transaction */
     MDB_txn* txn = NULL;
@@ -143,8 +150,7 @@ retry:
 
     /* Increase retry count */
     retry_count++;
-
-    /* Begin transaction */
+    /* Begin transaction with correct flags */
     switch(ops_txn_begin(&txn, txn_open_flags, &res))
     {
         case DB_SAFETY_SUCCESS:
@@ -152,37 +158,55 @@ retry:
         case DB_SAFETY_RETRY:
             goto retry;
         default:
+            EML_ERROR(LOG_TAG, "ops_execute_operations: _txn_begin failed, err=%d", res);
             goto fail;
     }
 
     /* Execute all cached operations */
-    switch(_exec_ops(txn))
+    switch(_exec_ops(txn, &res))
     {
         case DB_SAFETY_SUCCESS:
             break;
         case DB_SAFETY_RETRY:
             goto retry;
         default:
+            EML_ERROR(LOG_TAG, "ops_execute_operations: _exec_ops failed, err=%d", res);
             goto fail;
     }
 
-    /* Commit transaction */
-    switch(ops_txn_commit(txn, &res))
+    /* If RO no commit, if RW commit */
+    switch (txn_open_flags)
     {
-        case DB_SAFETY_SUCCESS:
-            break;
-        case DB_SAFETY_RETRY:
-            goto retry;
-        default:
-            goto fail;
+    /* ROnly, no commit just abort, fast path */
+    case MDB_RDONLY:
+        mdb_txn_abort(txn);
+        res = 0;
+        EML_DBG(LOG_TAG, "ops_execute_operations: RO txn completed, aborted");
+        goto done;
+    
+    default:
+        /* Commit transaction */
+        switch(ops_txn_commit(txn, &res))
+        {
+            case DB_SAFETY_SUCCESS:
+                break;
+            case DB_SAFETY_RETRY:
+                goto retry;
+            default:
+                EML_ERROR(LOG_TAG, "ops_execute_operations: _txn_commit failed, err=%d", res);  
+                goto fail;
+        }
+        EML_DBG(LOG_TAG, "ops_execute_operations: RW txn committed");
+        break;
     }
+
 }  // retry
 
+done:
     res = 0;
 
 fail:
     /* wipe the cache */
-    EML_ERROR(LOG_TAG, "ops_exec: txn_commit failed, err=%d", res);
     memset(ops_cache, 0, sizeof(op_batch_t));
     return res;
 }
