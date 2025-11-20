@@ -4,9 +4,9 @@ This document captures the structural view of the LMDB wrapper around `db_lmdb_*
 
 ## Scope
 
-- Public surface: what headers a consumer includes (`db_lmdb.h`, `db.h`, `dbi.h`) and how `db.h` re-exports DBI structures.
-- Internal layering: API → core → DB/DBI management → ops/void store.
-- External services: LMDB C API and EMlog reached only through the internal shim (`internal.h`/`config.h`).
+- Public surface: what headers a consumer includes (`db_lmdb_core.h`) and how it re-exports DBI and operation types.
+- Internal layering: Core → Ops → DB/Security, with Core depending only on the ops facade and DB types.
+- External services: LMDB C API and EMlog reached only through `config.h`/`common.h` and the security policy.
 
 ## Packages and boundaries (PlantUML-rendered)
 
@@ -30,27 +30,21 @@ Facade plus internal helpers for environment setup, transactions and batched ope
 
 ![Ops package](../plantuml/generated/ops_package.svg)
 
-### Reading the arrows
-
-- Direction means "depends on" (e.g., `db_lmdb.h` depends on `db_lmdb_core.c`).
-- Public callers only see `db_lmdb.h` and `db.h`; `db.h` pulls in `dbi.h` so DBI structs are part of the public contract without leaking C-file internals.
-- `void_store` is deliberately only reachable from the ops layer.
-- LMDB/EMlog remain hidden behind `internal.h`/`config.h`, keeping externals from bleeding into public headers.
-
 ## Responsibility map
 
-- `api/db_lmdb.c` — entrypoints, parameter validation, and high-level lifecycles.
-- `core/db_lmdb_core.c` — LMDB env/txn helpers, retries, resize policy.
-- `db/db_lmdb_dbi.c` — DBI opening, flag caching, descriptor exposure through `DB`.
-- `ops/db_lmdb_ops.c` — operational functions that consume DBI descriptors; batches work in transactions.
-- `ops/void_store.c` — scratch space for ops only; keep this out of API/core/db layers.
-- `include/db/db.h` — defines `DB` facade and intentionally includes `dbi.h` so DBI descriptors are officially part of the surface.
-- `include/db/dbi.h` — public DBI declarations (types/flags); owned by DB package but reusable by callers.
-- `include/internal/internal.h` + `include/core/config.h` — common structs/configuration; the only path to LMDB and EMlog.
+- `app/include/db_lmdb_core.h` — single public entrypoint; re-exports the core facade.
+- `app/src/core/core.c` — core orchestration: env/DBI init via ops, add/execute ops, shutdown.
+- `app/include/core/operations/ops_facade.h` — ops facade types (`op_type_t`) and linkage to ops internals.
+- `app/src/core/operations/ops_int/ops_init.c` — LMDB env creation, mapsize/max-db configuration, DBI open/flag caching.
+- `app/src/core/operations/ops_int/ops_actions.c` — transaction helpers and single PUT/GET operations.
+- `app/src/core/operations/ops_int/ops_exec.c` — batched operations and retry policy around transactions.
+- `app/src/core/operations/ops_int/security/security.c` — LMDB→errno mapping, safety decisions, mapsize expansion.
+- `app/include/core/operations/ops_int/db/db.h` — `DataBase_t` and global `DataBase` handle, owned by the DB package.
+- `app/include/core/operations/ops_int/db/dbi_ext.h` — public DBI declarations (`dbi_type_t`); exported via the core header.
 
 ## Dependency rules (keep the separation of concerns)
 
-- Public headers must not include LMDB or EMlog headers directly; use `internal.h` as the shim.
-- `dbi.h` may be included by callers only through `db.h` (exported) or directly (advanced users); do not add C file dependencies there.
-- `void_store` stays private to ops; if another layer needs buffers, create a new helper within that layer instead of linking to `void_store`.
-- Cross-layer calls flow downward (API → core → dbi → ops). Avoid lateral dependencies to keep the diagram stable.
+- Public consumers include only `db_lmdb_core.h`; they should not reach into `ops_int` or `security` directly.
+- Core may depend on `ops_facade.h` and DB headers, but not on LMDB or EMlog headers directly.
+- Ops internals depend on DB and Security to perform work, but Security is the only module allowed to interpret raw LMDB return codes.
+- Cross-layer calls flow downward (Core → Ops → DB/Security → LMDB/EMlog). Avoid lateral shortcuts that bypass the facade or security policy.

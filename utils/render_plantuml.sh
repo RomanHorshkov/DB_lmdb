@@ -21,7 +21,9 @@ plantuml -tsvg -o "../$(basename "${OUT_DIR}")" \
   static_architecture.puml \
   dynamic_init.puml \
   dynamic_ops.puml \
-  db_package.puml
+  db_package.puml \
+  security_package.puml \
+  ops_package.puml
 popd >/dev/null
 
 echo "Rendered SVGs to ${OUT_DIR}"

@@ -9,6 +9,23 @@ package "db" {
   component "db.h" as db_h
   component "dbi_int.h" as dbi_int
   component "dbi_ext.h" as dbi_ext
+
+  note right of db_h
+  Main LMDB DB struct (DataBase_t)
+  and global DataBase handle DataBase.
+  Includes dbi_int.h and lmdb.h;
+  initialized / torn down by the core layer.
+  end note
+
+  note right of dbi_int
+  Descriptor for opened DBIs (dbi_t array),
+  exposed via db.h and using dbi_ext.h types.
+  end note
+
+  note right of dbi_ext
+  Logical DBI kinds (dbi_type_t)
+  for default / DUPSORT / DUPFIXED.
+  end note
 }
 
 component "lmdb.h" as lmdb
@@ -16,22 +33,5 @@ component "lmdb.h" as lmdb
 db_h --> dbi_int
 dbi_int --> dbi_ext
 db_h --> lmdb
-
-note right of db_h
-Main LMDB DB struct (DataBase_t)
-and global DataBase handle DataBase.
-Includes dbi_int.h and lmdb.h;
-initialized / torn down by the core layer.
-end note
-
-note right of dbi_int
-Descriptor for opened DBIs (dbi_t array),
-exposed via db.h and using dbi_ext.h types.
-end note
-
-note right of dbi_ext
-Logical DBI kinds (dbi_type_t)
-for default / DUPSORT / DUPFIXED.
-end note
 
 @enduml

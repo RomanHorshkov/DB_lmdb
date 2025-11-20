@@ -1,117 +1,78 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="1122.9167px" preserveAspectRatio="none" style="width:691px;height:1122px;" version="1.1" viewBox="0 0 691 1122" width="691.25px" zoomAndPan="magnify"><defs/><g><text fill="#000000" font-family="Arial" font-size="20.4167" lengthAdjust="spacingAndGlyphs" textLength="285.8333" x="207.8125" y="18.9512">LMDB Wrapper — Static view</text><!--MD5=[67f6b1feb238ea7c6d83f33c681626c9]
-cluster Public surface--><path d="M37.9167,58.7663 L198.3333,58.7663 A8.75,8.75 0 0 1 204.1667,64.5996 L214.375,91.2826 L212.9167,91.2826 A5.8333,5.8333 0 0 1 218.75,97.1159 L218.75,525.4329 A5.8333,5.8333 0 0 1 212.9167,531.2663 L37.9167,531.2663 A5.8333,5.8333 0 0 1 32.0833,525.4329 L32.0833,64.5996 A5.8333,5.8333 0 0 1 37.9167,58.7663 " fill="#EEF2FF" style="stroke: #312E81; stroke-width: 2.1875;"/><line style="stroke: #312E81; stroke-width: 2.1875;" x1="32.0833" x2="214.375" y1="91.2826" y2="91.2826"/><text fill="#111827" font-family="Arial" font-size="20.4167" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="163.3333" x="37.9167" y="80.6342">Public surface</text><!--MD5=[2c2e2644034c00788261e03c85b06837]
-cluster Core--><path d="M259.5833,394.1829 L312.0833,394.1829 A8.75,8.75 0 0 1 317.9167,400.0163 L328.125,426.6992 L472.5,426.6992 A5.8333,5.8333 0 0 1 478.3333,432.5326 L478.3333,663.9746 A5.8333,5.8333 0 0 1 472.5,669.8079 L259.5833,669.8079 A5.8333,5.8333 0 0 1 253.75,663.9746 L253.75,400.0163 A5.8333,5.8333 0 0 1 259.5833,394.1829 " fill="#EEF2FF" style="stroke: #312E81; stroke-width: 2.1875;"/><line style="stroke: #312E81; stroke-width: 2.1875;" x1="253.75" x2="328.125" y1="426.6992" y2="426.6992"/><text fill="#111827" font-family="Arial" font-size="20.4167" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="55.4167" x="259.5833" y="416.0508">Core</text><!--MD5=[3a5f76864f9108a990fa16e00ab13457]
-cluster Ops--><path d="M150.2083,704.8079 L192.5,704.8079 A8.75,8.75 0 0 1 198.3333,710.6413 L208.5417,737.3242 L354.375,737.3242 A5.8333,5.8333 0 0 1 360.2083,743.1576 L360.2083,986.2663 A5.8333,5.8333 0 0 1 354.375,992.0996 L150.2083,992.0996 A5.8333,5.8333 0 0 1 144.375,986.2663 L144.375,710.6413 A5.8333,5.8333 0 0 1 150.2083,704.8079 " fill="#EEF2FF" style="stroke: #312E81; stroke-width: 2.1875;"/><line style="stroke: #312E81; stroke-width: 2.1875;" x1="144.375" x2="208.5417" y1="737.3242" y2="737.3242"/><text fill="#111827" font-family="Arial" font-size="20.4167" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="45.2083" x="150.2083" y="726.6758">Ops</text><!--MD5=[e2307af040e3f87d22824e7603ca28ec]
-entity api--><rect fill="#DCFCE7" height="75.0016" rx="5.8333" ry="5.8333" style="stroke: #15803D; stroke-width: 2.1875;" width="126.875" x="67.8125" y="109.8079"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="60.5208" y="117.0996"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="60.5208" y="170.2262"/><text fill="#000000" font-family="Arial" font-size="20.4167" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="86.0417" x="88.2292" y="143.3425">«public»</text><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="97.7083" x="82.3958" y="165.7551">db_lmdb.h</text><!--MD5=[7468467f3b6b392f1d176d828c753b77]
-entity db--><rect fill="#DCFCE7" height="75.0016" rx="5.8333" ry="5.8333" style="stroke: #15803D; stroke-width: 2.1875;" width="115.2083" x="75.1042" y="271.6829"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="67.8125" y="278.9746"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="67.8125" y="332.1012"/><text fill="#000000" font-family="Arial" font-size="20.4167" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="86.0417" x="89.6875" y="305.2175">«public»</text><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="40.8333" x="112.2917" y="327.6301">db.h</text><!--MD5=[e4cd3576b7bca34ca23f2e40650800c3]
-entity dbi_h--><rect fill="#DCFCE7" height="75.0016" rx="5.8333" ry="5.8333" style="stroke: #15803D; stroke-width: 2.1875;" width="115.2083" x="78.0208" y="433.5579"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="70.7292" y="440.8496"/><rect fill="#DCFCE7" height="7.2917" style="stroke: #15803D; stroke-width: 2.1875;" width="14.5833" x="70.7292" y="493.9762"/><text fill="#000000" font-family="Arial" font-size="20.4167" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="86.0417" x="92.6042" y="467.0925">«public»</text><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="45.2083" x="113.0208" y="489.5051">dbi.h</text><!--MD5=[0d482ad21d5c7c11aa976e45da5ecfe6]
-entity core--><rect fill="#E5E7EB" height="51.2354" rx="5.8333" ry="5.8333" style="stroke: #1F2937; stroke-width: 2.1875;" width="176.4583" x="277.8125" y="445.2246"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="270.5208" y="452.5163"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="270.5208" y="481.8766"/><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="147.2917" x="292.3958" y="477.4055">db_lmdb_core.c</text><!--MD5=[79a24148e98718e5139465e374c13cf9]
-entity dbi--><rect fill="#E5E7EB" height="51.2354" rx="5.8333" ry="5.8333" style="stroke: #1F2937; stroke-width: 2.1875;" width="163.3333" x="277.0833" y="595.4329"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="269.7917" y="602.7246"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="269.7917" y="632.085"/><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="134.1667" x="291.6667" y="627.6138">db_lmdb_dbi.c</text><!--MD5=[5a9f12e3433feb7a47fb7cbcc8ee5d5d]
-entity ops--><rect fill="#E5E7EB" height="51.2354" rx="5.8333" ry="5.8333" style="stroke: #1F2937; stroke-width: 2.1875;" width="169.1667" x="167.7083" y="755.8496"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="160.4167" y="763.1413"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="160.4167" y="792.5016"/><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="140" x="182.2917" y="788.0305">db_lmdb_ops.c</text><!--MD5=[3469974f87d452ee0835fa7fe098ac20]
-entity void_store--><rect fill="#FFE4E6" height="75.0016" rx="5.8333" ry="5.8333" style="stroke: #BE123C; stroke-width: 2.1875;" width="141.4583" x="181.5625" y="894.3913"/><rect fill="#FFE4E6" height="7.2917" style="stroke: #BE123C; stroke-width: 2.1875;" width="14.5833" x="174.2708" y="901.6829"/><rect fill="#FFE4E6" height="7.2917" style="stroke: #BE123C; stroke-width: 2.1875;" width="14.5833" x="174.2708" y="954.8096"/><text fill="#000000" font-family="Arial" font-size="20.4167" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="100.625" x="201.9792" y="927.9258">«internal»</text><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="112.2917" x="196.1458" y="950.3384">void_store.c</text><!--MD5=[7c78bb30c84a92a815863bc0c3b1b296]
-entity internal--><rect fill="#FFE4E6" height="75.0016" rx="5.8333" ry="5.8333" style="stroke: #BE123C; stroke-width: 2.1875;" width="207.0833" x="383.5417" y="894.3913"/><rect fill="#FFE4E6" height="7.2917" style="stroke: #BE123C; stroke-width: 2.1875;" width="14.5833" x="376.25" y="901.6829"/><rect fill="#FFE4E6" height="7.2917" style="stroke: #BE123C; stroke-width: 2.1875;" width="14.5833" x="376.25" y="954.8096"/><text fill="#000000" font-family="Arial" font-size="20.4167" font-style="italic" lengthAdjust="spacingAndGlyphs" textLength="100.625" x="436.7708" y="927.9258">«internal»</text><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="177.9167" x="398.125" y="950.3384">internal.h / config.h</text><!--MD5=[2b33d9edc820bacf95df57a8f964e5dc]
-entity lmdb--><rect fill="#E5E7EB" height="51.2354" rx="5.8333" ry="5.8333" style="stroke: #1F2937; stroke-width: 2.1875;" width="137.0833" x="336.875" y="1056.2663"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="329.5833" y="1063.5579"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="329.5833" y="1092.9183"/><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="107.9167" x="351.4583" y="1088.4472">LMDB C API</text><!--MD5=[d60f7c64bf1ce40dcccfba60774db125]
-entity emlog--><rect fill="#E5E7EB" height="51.2354" rx="5.8333" ry="5.8333" style="stroke: #1F2937; stroke-width: 2.1875;" width="84.5833" x="525" y="1056.2663"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="517.7083" y="1063.5579"/><rect fill="#E5E7EB" height="7.2917" style="stroke: #1F2937; stroke-width: 2.1875;" width="14.5833" x="517.7083" y="1092.9183"/><text fill="#0F172A" font-family="Arial" font-size="18.9583" lengthAdjust="spacingAndGlyphs" textLength="55.4167" x="539.5833" y="1088.4472">EMlog</text><path d="M346.3542,283.3496 L346.3542,303.0371 L190.6187,308.8704 L346.3542,314.7038 L346.3542,333.7988 A5.8333,5.8333 0 0 0 352.1875,339.6322 L668.6458,339.6322 A5.8333,5.8333 0 0 0 674.4792,333.7988 L674.4792,292.0996 L659.8958,277.5163 L352.1875,277.5163 A5.8333,5.8333 0 0 0 346.3542,283.3496 " fill="#FFF7ED" style="stroke: #EA580C; stroke-width: 1.4583333333333333;"/><path d="M659.8958,277.5163 L659.8958,289.1829 A2.9167,2.9167 0 0 0 662.8125,292.0996 L674.4792,292.0996 L659.8958,277.5163 " fill="#FFF7ED" style="stroke: #EA580C; stroke-width: 1.4583333333333333;"/><text fill="#7C2D12" font-family="Arial" font-size="20.4167" lengthAdjust="spacingAndGlyphs" textLength="284.375" x="355.1042" y="303.7592">Exposes dbi.h so callers can</text><text fill="#7C2D12" font-family="Arial" font-size="20.4167" lengthAdjust="spacingAndGlyphs" textLength="297.5" x="355.1042" y="327.5254">use dbi_desc_t alongside DB.</text><!--MD5=[6066d403ec656b869ecf651cef084f26]
-link api to core--><path d="M157.7333,184.635 C204.3563,248.3496 300.3146,379.4684 343.7729,438.8517 " fill="none" id="api-&gt;core" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="348.3083,445.0496,345.2766,431.0103,344.0072,439.1616,335.8559,437.8921,348.3083,445.0496" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[1b9dbcfdb69d97b7ce5f2d963fc4ed75]
-link api to db--><path d="M131.5854,184.5184 C131.8042,208.0996 132.0812,239.0309 132.3146,263.9538 " fill="none" id="api-&gt;db" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="132.3729,271.4788,138.0935,258.3043,132.3104,264.1874,126.4273,258.4043,132.3729,271.4788" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[bddedd19a2acca0597cc33c52255e12f]
-link db to dbi_h--><path d="M133.3646,346.3934 C133.8021,369.9746 134.3708,400.9059 134.8229,425.8288 " fill="none" id="db-&gt;dbi_h" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="134.9688,433.3538,140.5385,420.1148,134.8229,426.0636,128.8741,420.348,134.9688,433.3538" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[a4b200d086ecf3563289e482f4b8f105]
-link dbi_h to dbi--><path d="M190.2104,508.2392 C228.8271,533.7309 279.9125,567.4475 315.6708,591.0579 " fill="none" id="dbi_h-&gt;dbi" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="322.1604,595.3454,314.3797,583.2726,316.0615,591.3489,307.9852,593.0308,322.1604,595.3454" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[9f91a1e7582058f7614920dd23aa64d0]
-link core to dbi--><path d="M364.8312,496.5288 C363.6063,521.4663 361.6813,560.3892 360.325,587.7475 " fill="none" id="core-&gt;dbi" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="359.9604,595.1413,366.4254,582.3156,360.3152,587.8582,354.7726,581.748,359.9604,595.1413" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[f96ad10a2f90508d4e9640083109aad5]
-link dbi to ops--><path d="M342.1104,647.0288 C323.4437,674.6496 293.125,719.4934 272.9562,749.3454 " fill="none" id="dbi-&gt;ops" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="268.8146,755.4704,280.9971,747.8626,272.8977,749.4292,271.3311,741.3297,268.8146,755.4704" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[c749611fe309f3076920595b1f012617]
-link ops to void_store--><path d="M252.2917,807.1538 C252.2917,828.6204 252.2917,860.4559 252.2917,886.3559 " fill="none" id="ops-&gt;void_store" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="252.2917,894.1725,258.125,881.0475,252.2917,886.8809,246.4583,881.0475,252.2917,894.1725" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[210bf89af3452b6b98e07dba5249241f]
-link core to internal--><path d="M393.8521,496.4413 C417.9,519.2788 451.1792,555.8246 466.6667,595.4329 C505.1521,693.8267 499.3333,820.9496 492.6833,886.5892 " fill="none" id="core-&gt;internal" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="491.9104,893.8954,499.0633,881.4404,492.6607,886.6425,487.4586,880.2399,491.9104,893.8954" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[628703a4420602cc94f6633827f19f61]
-link dbi to internal--><path d="M368.8271,646.5621 C390.4833,698.5079 441.7729,821.46 469.1312,887.085 " fill="none" id="dbi-&gt;internal" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="472.0333,894.0267,472.3541,879.6674,469.2215,887.299,461.5898,884.1664,472.0333,894.0267" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[2376eb7232dc150be429f9dccb41491b]
-link ops to internal--><path d="M291.0687,807.1538 C326.9146,829.6413 380.8729,863.4892 423.1208,889.9871 " fill="none" id="ops-&gt;internal" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="429.7854,894.1725,421.7579,882.2623,423.6056,890.3023,415.5656,892.15,429.7854,894.1725" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[907b30d9e06c4d8047738a0e668091ab]
-link internal to lmdb--><path d="M467.1042,969.0725 C453.4979,993.6163 435.6625,1025.7725 422.6687,1049.2079 " fill="none" id="internal-&gt;lmdb" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="418.8042,1056.1788,430.2775,1047.5384,422.3453,1049.8047,420.079,1041.8725,418.8042,1056.1788" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[7f7fd18ad685408862ea6f9e8af256e1]
-link internal to emlog--><path d="M506.6979,969.0725 C520.0708,993.6163 537.5854,1025.7725 550.3458,1049.2079 " fill="none" id="internal-&gt;emlog" style="stroke: #2563EB; stroke-width: 2.1875;"/><polygon fill="#2563EB" points="554.1375,1056.1788,552.9736,1041.8631,550.6459,1049.7775,542.7315,1047.4497,554.1375,1056.1788" style="stroke: #2563EB; stroke-width: 2.1875;"/><!--MD5=[5e98c11384d1e904565a2c3988920f3e]
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="544px" preserveAspectRatio="none" style="width:976px;height:544px;" version="1.1" viewBox="0 0 976 544" width="976px" zoomAndPan="magnify"><defs><filter height="300%" id="f2wne8a8hv5ix" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><text fill="#000000" font-family="sans-serif" font-size="18" lengthAdjust="spacingAndGlyphs" textLength="495" x="244" y="16.708">LMDB Wrapper — Packages (Core / Ops / DB / Security)</text><!--MD5=[2c2e2644034c00788261e03c85b06837]
+cluster Core--><polygon fill="#FFFFFF" filter="url(#f2wne8a8hv5ix)" points="22,109.4531,66,109.4531,73,131.75,322,131.75,322,480.9531,22,480.9531,22,109.4531" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="22" x2="73" y1="131.75" y2="131.75"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="38" x="26" y="124.4482">Core</text><!--MD5=[3a5f76864f9108a990fa16e00ab13457]
+cluster Ops--><polygon fill="#FFFFFF" filter="url(#f2wne8a8hv5ix)" points="46,222.9531,83,222.9531,90,245.25,298,245.25,298,456.9531,46,456.9531,46,222.9531" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="46" x2="90" y1="245.25" y2="245.25"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="31" x="50" y="237.9482">Ops</text><!--MD5=[e169ac431914a6adb8cf110c9da1459f]
+cluster DB--><polygon fill="#FFFFFF" filter="url(#f2wne8a8hv5ix)" points="70,345.9531,97,345.9531,104,368.25,144,368.25,144,432.9531,70,432.9531,70,345.9531" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="70" x2="104" y1="368.25" y2="368.25"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="21" x="74" y="360.9482">DB</text><!--MD5=[109515bbac35f821417e1764695b17cb]
+cluster Security--><polygon fill="#FFFFFF" filter="url(#f2wne8a8hv5ix)" points="168,345.9531,239,345.9531,246,368.25,274,368.25,274,432.9531,168,432.9531,168,345.9531" style="stroke: #000000; stroke-width: 1.5;"/><line style="stroke: #000000; stroke-width: 1.5;" x1="168" x2="246" y1="368.25" y2="368.25"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacingAndGlyphs" textLength="65" x="172" y="360.9482">Security</text><!--MD5=[0d482ad21d5c7c11aa976e45da5ecfe6]
+entity core--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="53" x="232.5" y="144.4531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="227.5" y="149.4531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="227.5" y="170.75"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="33" x="242.5" y="167.4482">Core</text><!--MD5=[5a9f12e3433feb7a47fb7cbcc8ee5d5d]
+entity ops--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="48" x="215" y="257.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="210" y="262.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="210" y="284.25"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="28" x="225" y="280.9482">Ops</text><!--MD5=[7468467f3b6b392f1d176d828c753b77]
+entity db--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="41" x="86.5" y="380.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="81.5" y="385.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="81.5" y="407.25"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="21" x="96.5" y="403.9482">DB</text><!--MD5=[25fdbc256ceb9e3bdcb330150c9533c0]
+entity sec--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="75" x="183.5" y="380.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="178.5" y="385.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="178.5" y="407.25"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="55" x="193.5" y="403.9482">Security</text><!--MD5=[2b33d9edc820bacf95df57a8f964e5dc]
+entity lmdb--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="99" x="114.5" y="496.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="109.5" y="501.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="109.5" y="523.25"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="79" x="124.5" y="519.9482">LMDB C API</text><!--MD5=[d60f7c64bf1ce40dcccfba60774db125]
+entity emlog--><rect fill="#FEFECE" filter="url(#f2wne8a8hv5ix)" height="36.2969" style="stroke: #A80036; stroke-width: 1.5;" width="62" x="338" y="257.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="333" y="262.9531"/><rect fill="#FEFECE" height="5" style="stroke: #A80036; stroke-width: 1.5;" width="10" x="333" y="284.25"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacingAndGlyphs" textLength="42" x="348" y="280.9482">EMlog</text><path d="M114.5,29.4531 L114.5,84.8516 A0,0 0 0 0 114.5,84.8516 L255,84.8516 L259,144.3031 L263,84.8516 L403.5,84.8516 A0,0 0 0 0 403.5,84.8516 L403.5,39.4531 L393.5,29.4531 L114.5,29.4531 A0,0 0 0 0 114.5,29.4531 " fill="#FBFB77" filter="url(#f2wne8a8hv5ix)" style="stroke: #A80036; stroke-width: 1.0;"/><path d="M393.5,29.4531 L393.5,39.4531 L403.5,39.4531 L393.5,29.4531 " fill="#FBFB77" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="34" x="120.5" y="46.52">Core:</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="210" x="120.5" y="61.6528">- public facade and orchestration</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="268" x="120.5" y="76.7856">- owns init / add_op / exec_ops / shutdown</text><path d="M435.5,240.4531 L435.5,310.9844 L630.5,310.9844 L630.5,250.4531 L620.5,240.4531 L435.5,240.4531 " fill="#FBFB77" filter="url(#f2wne8a8hv5ix)" style="stroke: #A80036; stroke-width: 1.0;"/><path d="M620.5,240.4531 L620.5,250.4531 L630.5,250.4531 L620.5,240.4531 " fill="#FBFB77" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="29" x="441.5" y="257.52">Ops:</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="113" x="441.5" y="272.6528">- env + DBI setup</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="132" x="441.5" y="287.7856">- transaction helpers</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="174" x="441.5" y="302.9185">- batched LMDB operations</text><path d="M338,371.4531 L338,426.8516 L602,426.8516 L602,381.4531 L592,371.4531 L338,371.4531 " fill="#FBFB77" filter="url(#f2wne8a8hv5ix)" style="stroke: #A80036; stroke-width: 1.0;"/><path d="M592,371.4531 L592,381.4531 L602,381.4531 L592,371.4531 " fill="#FBFB77" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="23" x="344" y="388.52">DB:</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="213" x="344" y="403.6528">- DataBase_t and DBI descriptors</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="243" x="344" y="418.7856">- hides raw LMDB handles from callers</text><path d="M637.5,371.4531 L637.5,426.8516 L964.5,426.8516 L964.5,381.4531 L954.5,371.4531 L637.5,371.4531 " fill="#FBFB77" filter="url(#f2wne8a8hv5ix)" style="stroke: #A80036; stroke-width: 1.0;"/><path d="M954.5,371.4531 L954.5,381.4531 L964.5,381.4531 L954.5,371.4531 " fill="#FBFB77" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="56" x="643.5" y="388.52">Security:</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="160" x="643.5" y="403.6528">- LMDB rc → safety policy</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="306" x="643.5" y="418.7856">- central errno mapping and mapsize expansion</text><!--MD5=[ccd66224e0e50ee081bacd31087f5bef]
+link core to ops--><path d="M255.88,180.8731 C252.41,200.1831 246.81,231.3831 243.03,252.5131 " fill="none" id="core-&gt;ops" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="242.1,257.6531,247.6288,249.5025,242.9844,252.732,239.755,248.0875,242.1,257.6531" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[29930ae0ccb48ea3733796c1004e78c7]
+link ops to db--><path d="M218.17,294.2131 C203.85,306.2331 184.51,322.7731 168,337.9531 C154.25,350.6031 139.28,365.3031 127.62,376.9931 " fill="none" id="ops-&gt;db" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="123.79,380.8331,132.9752,377.279,127.3184,377.2905,127.307,371.6336,123.79,380.8331" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[157f2c83c2fe6afc7ea5f1c634c00083]
+link ops to sec--><path d="M236.46,294.0331 C233.29,315.3531 227.86,351.8731 224.35,375.4531 " fill="none" id="ops-&gt;sec" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="223.59,380.5731,228.8832,372.2676,224.3331,375.6287,220.972,371.0786,223.59,380.5731" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[d67a83a8789680248b318c9bffbf5460]
+link db to lmdb--><path d="M115.66,417.2631 C125.68,437.3031 142.19,470.3231 153.08,492.1131 " fill="none" id="db-&gt;lmdb" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="155.45,496.8531,154.9902,487.015,153.2082,492.3838,147.8394,490.6018,155.45,496.8531" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[d6618c532fb8fe0276e83c19d3dc4bb3]
+link sec to lmdb--><path d="M212.34,417.2631 C202.32,437.3031 185.81,470.3231 174.92,492.1131 " fill="none" id="sec-&gt;lmdb" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="172.55,496.8531,180.1606,490.6018,174.7918,492.3838,173.0098,487.015,172.55,496.8531" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[a9f3ea2cadc8e05e42e6af19716349c0]
+link core to emlog--><path d="M276.19,180.8731 C295.64,200.5931 327.33,232.7131 348.17,253.8431 " fill="none" id="core-&gt;emlog" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="351.93,257.6531,348.4502,248.4395,348.416,254.0962,342.7592,254.0619,351.93,257.6531" style="stroke: #A80036; stroke-width: 1.0;"/><!--MD5=[c9f46aefd8048937816a9521ca053c00]
+link ops to GMN22--><path d="M254.79,257.8131 C272.8,238.6431 304.23,209.5631 338.5,197.7031 C391.81,179.2531 451.87,211.8331 490.96,240.4031 " fill="none" id="ops-GMN22" style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><!--MD5=[47c840107c44f31df946842012c0dcb2]
+link db to GMN25--><path d="M118.83,380.8731 C132.32,362.2131 156.34,334.5031 185.5,324.7031 C268.73,296.7531 368.55,339.8731 425.09,371.1831 " fill="none" id="db-GMN25" style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><!--MD5=[14631a8063210318e82b185c1a341ff8]
+link sec to GMN28--><path d="M241.7,380.6731 C263.87,362.4231 300.95,335.5731 338.5,324.7031 C394.85,308.3931 544.77,314.2631 602.5,324.7031 C651.92,333.6431 705.07,354.1631 743.93,371.3631 " fill="none" id="sec-GMN28" style="stroke: #A80036; stroke-width: 1.0; stroke-dasharray: 7.0,7.0;"/><!--MD5=[105e866944effe564d36adce40a7d090]
 @startuml
-skinparam shadowing false
-skinparam roundCorner 8
-skinparam backgroundColor #FFFFFF
-skinparam dpi 140
-skinparam defaultFontName "Arial"
-skinparam defaultFontSize 14
-skinparam defaultTextAlignment left
-skinparam ArrowColor #2563EB
-skinparam ArrowThickness 1.5
-skinparam ArrowFontSize 13
-skinparam package {
-  BackgroundColor #EEF2FF
-  BorderColor #312E81
-  FontColor #111827
-  FontSize 14
-}
-skinparam rectangle {
-  FontColor #0F172A
-  FontSize 13
-  BorderColor #2563EB
-  BackgroundColor #DBEAFE
-  RoundCorner 6
-}
-skinparam component {
-  FontColor #0F172A
-  FontSize 13
-  BorderColor #1F2937
-  BackgroundColor #E5E7EB
-}
-skinparam note {
-  BackgroundColor #FFF7ED
-  BorderColor #EA580C
-  FontColor #7C2D12
-}
-skinparam legend {
-  BackgroundColor #F8FAFC
-  BorderColor #CBD5E1
-  FontColor #0F172A
-}
-skinparam component<<public>> {
-  BackgroundColor #DCFCE7
-  BorderColor #15803D
-}
-skinparam component<<internal>> {
-  BackgroundColor #FFE4E6
-  BorderColor #BE123C
-}
 
-title LMDB Wrapper — Static view
+title LMDB Wrapper — Packages (Core / Ops / DB / Security)
 
-package "Public surface" {
-  component "db_lmdb.h" <<public>> as api
-  component "db.h" <<public>> as db
-  component "dbi.h" <<public>> as dbi_h
-}
+skinparam backgroundColor transparent
 
 package "Core" {
-  component "db_lmdb_core.c" as core
-  component "db_lmdb_dbi.c" as dbi
+  component "Core" as core
+
+  package "Ops" {
+    component "Ops" as ops
+
+    package "DB" {
+      component "DB" as db
+    }
+
+    package "Security" {
+      component "Security" as sec
+    }
+  }
 }
 
-package "Ops" {
-  component "db_lmdb_ops.c" as ops
-  component "void_store.c" <<internal>> as void_store
-}
-
-component "internal.h / config.h" <<internal>> as internal
 component "LMDB C API" as lmdb
 component "EMlog" as emlog
 
-api - -> core
-api - -> db
-db - -> dbi_h
-dbi_h - -> dbi
-core - -> dbi
-dbi - -> ops
-ops - -> void_store
+core - -> ops
+ops - -> db
+ops - -> sec
+db - -> lmdb
+sec - -> lmdb
+core - -> emlog
 
-core - -> internal
-dbi - -> internal
-ops - -> internal
-internal - -> lmdb
-internal - -> emlog
+note top of core
+Core:
+- public facade and orchestration
+- owns init / add_op / exec_ops / shutdown
+end note
+
+note right of ops
+Ops:
+- env + DBI setup
+- transaction helpers
+- batched LMDB operations
+end note
 
 note right of db
-Exposes dbi.h so callers can
-use dbi_desc_t alongside DB.
+DB:
+- DataBase_t and DBI descriptors
+- hides raw LMDB handles from callers
+end note
+
+note right of sec
+Security:
+- LMDB rc → safety policy
+- central errno mapping and mapsize expansion
 end note
 
 @enduml
