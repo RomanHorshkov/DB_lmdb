@@ -83,6 +83,7 @@ db_security_ret_code_t act_txn_begin(MDB_txn** out_txn, const unsigned flags, in
         EML_ERROR(LOG_TAG, "_txn_begin: mdb_txn_begin failed, mdb_rc=%d", mdb_res);
         return security_check(mdb_res, NULL, out_err);
     }
+    EML_DBG(LOG_TAG, "act_txn_begin: txn begun (flags=0x%x)", flags);
     return DB_SAFETY_SUCCESS;
 }
 
@@ -103,6 +104,7 @@ db_security_ret_code_t act_txn_commit(MDB_txn* const txn, int* const out_err)
         EML_ERROR(LOG_TAG, "_txn_commit: mdb_txn_commit failed, mdb_rc=%d", mdb_res);
         return security_check(mdb_res, txn, out_err);
     }
+    EML_DBG(LOG_TAG, "act_txn_commit: txn committed");
     return DB_SAFETY_SUCCESS;
 }
 

@@ -59,6 +59,9 @@ int db_core_init(const char* const path, const unsigned int mode,
                  const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {
+    EML_INFO(LOG_TAG, "_init_db: starting init (path=%s, mode=%o, n_dbis=%u)",
+             path ? path : "(null)", mode, n_dbis);
+
     if(DataBase)
     {
         EML_ERROR(LOG_TAG, "_db_init: database already initialized");
@@ -105,6 +108,7 @@ int db_core_init(const char* const path, const unsigned int mode,
     switch(ops_init_env(DB_MAX_DBIS, path, mode, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_INFO(LOG_TAG, "_init_db: environment initialized (max_dbis=%u)", DB_MAX_DBIS);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _init_env failed, err=%d", out_err_val);
@@ -117,6 +121,7 @@ int db_core_init(const char* const path, const unsigned int mode,
     switch(act_txn_begin(&txn, 0, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "_init_db: init transaction begun");
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _txn_begin failed, err=%d", out_err_val);
@@ -139,6 +144,7 @@ int db_core_init(const char* const path, const unsigned int mode,
         switch(ops_init_dbi(txn, name, i, type, out_err))
         {
             case DB_SAFETY_SUCCESS:
+                EML_INFO(LOG_TAG, "_init_db: DBI[%u] \"%s\" initialized (type=%d)", i, name, type);
                 break;
             default:
                 EML_ERROR(LOG_TAG, "_init_db: _init_dbi failed for dbi %s, err=%d", name,
@@ -150,6 +156,7 @@ int db_core_init(const char* const path, const unsigned int mode,
     switch(act_txn_commit(txn, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "_init_db: init transaction committed");
             break;
         default:
             EML_PERR(LOG_TAG, "_init_db: _txn_commit failed err=%d", *out_err);
@@ -215,12 +222,26 @@ int db_core_add_op(unsigned dbi_idx, op_type_t type,
     op.key  = key_desc;
     op.val  = val_desc;
 
+    EML_DBG(LOG_TAG,
+            "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
+            dbi_idx, (int)type, key_size, val_size);
+
     return ops_add_operation(&op);
 }
 
 int db_core_exec_ops(void)
 {
-    return ops_execute_operations();
+    EML_INFO(LOG_TAG, "db_core_exec_ops: executing queued operations");
+    int rc = ops_execute_operations();
+    if(rc == 0)
+    {
+        EML_INFO(LOG_TAG, "db_core_exec_ops: batch completed successfully");
+    }
+    else
+    {
+        EML_ERROR(LOG_TAG, "db_core_exec_ops: batch failed, rc=%d", rc);
+    }
+    return rc;
 }
 
 size_t db_core_shutdown(void)
@@ -233,6 +254,7 @@ size_t db_core_shutdown(void)
     /* Best-effort: ask LMDB for the current mapsize. */
     if(DataBase->env)
     {
+        EML_INFO(LOG_TAG, "_shutdown: starting LMDB env teardown");
         MDB_envinfo info;
         int         rc = mdb_env_info(DataBase->env, &info);
         if(rc == MDB_SUCCESS)

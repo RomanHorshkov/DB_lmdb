@@ -113,6 +113,11 @@ int ops_add_operation(const op_t* operation)
     /* shallow struct copy */
     ops_cache.ops[ops_cache.n_ops++] = *operation;
 
+    EML_DBG(LOG_TAG,
+            "ops_add_operation: queued op #%zu (dbi=%u type=%d key_kind=%d val_kind=%d)",
+            ops_cache.n_ops - 1, operation->dbi, (int)operation->type, operation->key.kind,
+            operation->val.kind);
+
     return 0;
 }
 

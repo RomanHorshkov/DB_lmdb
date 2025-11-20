@@ -221,12 +221,16 @@ db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi
 db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
                                     const unsigned int mode, int* const out_err)
 {
+    EML_INFO(LOG_TAG, "ops_init_env: creating LMDB env (path=%s, mode=%o, max_dbis=%u)",
+             path ? path : "(null)", mode, max_dbis);
+
     /* Do NOT allow retry at initialization */
 
     /* Create environment */
     switch(_db_create_env(out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "ops_init_env: environment handle created");
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _create_env failed");
@@ -237,6 +241,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_set_max_dbis(max_dbis, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "ops_init_env: max DBIs set to %u", max_dbis);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_max_dbis failed");
@@ -247,6 +252,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_set_map_size(out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "ops_init_env: initial map size set to %zu", (size_t)DB_MAP_SIZE_INIT);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_map_size failed");
@@ -257,6 +263,7 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_open_env(path, mode, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_INFO(LOG_TAG, "ops_init_env: environment opened at %s", path);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _open_env failed");
@@ -283,6 +290,8 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     switch(_dbi_open(txn, dbi_idx, name, open_flags, out_err))
     {
         case DB_SAFETY_SUCCESS:
+            EML_DBG(LOG_TAG, "ops_init_dbi: opened DBI[%u] \"%s\" (flags=0x%x)", dbi_idx, name,
+                    open_flags);
             break;
         default:
             EML_ERROR(LOG_TAG, "ops_init_dbi: _dbi_open failed");
@@ -313,6 +322,10 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     /* derive dupfix and dupsort flags */
     dbi->is_dupsort  = (dbi->db_flags & MDB_DUPSORT) != 0;
     dbi->is_dupfixed = (dbi->db_flags & MDB_DUPFIXED) != 0;
+
+    EML_INFO(LOG_TAG,
+             "ops_init_dbi: DBI[%u] \"%s\" ready (db_flags=0x%x dupsort=%u dupfixed=%u)",
+             dbi_idx, name, dbi->db_flags, dbi->is_dupsort, dbi->is_dupfixed);
 
     return DB_SAFETY_SUCCESS;
 }
