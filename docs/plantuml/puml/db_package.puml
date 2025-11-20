@@ -1,22 +1,11 @@
 @startuml
 !include base.puml
 
-title DB package — db.h, dbi_int.h, dbi_ext.h
+title DB package
 
 ' Transparent canvas, but keep boxes readable.
-skinparam backgroundColor transparent
-skinparam component {
-  BackgroundColor #FFFFFF
-  BorderColor #1F2937
-  FontColor #0F172A
-}
-skinparam note {
-  BackgroundColor #FFFFFF
-  BorderColor #CBD5E1
-  FontColor #0F172A
-}
 
-package "DB headers" {
+package "db" {
   component "db.h" as db_h
   component "dbi_int.h" as dbi_int
   component "dbi_ext.h" as dbi_ext

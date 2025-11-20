@@ -1,0 +1,56 @@
+@startuml
+!include base.puml
+
+title Ops package — facade and internals
+
+package "Ops facade" {
+  component "ops_facade.h" <<internal>> as ops_fac
+}
+
+note left of ops_fac
+Facade for the core layer.
+Exposes:
+- op_type_t (DB_OPERATION_*)
+- high-level helpers in ops_*
+Core should only include this
+from the ops package.
+end note
+
+package "Ops internals" as ops_pack {
+  component "ops_internals.h" <<internal>> as ops_int
+  component "ops_init.h" <<internal>> as ops_init_h
+  component "ops_actions.h" <<internal>> as ops_act_h
+  component "ops_exec.h" <<internal>> as ops_exec_h
+    note right of ops_int
+    Private op_t / op_key_t wiring.
+    Only ops_init.h, ops_actions.h
+    and ops_exec.h should touch this.
+    end note
+}
+
+
+package "Security Package" as security {
+note top
+Central safety policy and errno
+mapping used by all ops helpers.
+end note
+}
+
+
+package "DB package" as db {
+}
+
+' Facade wiring
+ops_fac --> ops_init_h
+ops_fac --> ops_act_h
+ops_fac --> ops_exec_h
+
+ops_init_h --> ops_int
+ops_act_h --> ops_int
+ops_exec_h --> ops_int
+
+' Internals dependencies
+ops_pack --> security
+ops_int --> db
+
+@enduml

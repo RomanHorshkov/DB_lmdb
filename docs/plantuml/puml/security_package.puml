@@ -1,0 +1,29 @@
+@startuml
+!include base.puml
+
+title Security package — LMDB safety policy
+
+' Transparent canvas, keep boxes readable.
+package "Security" {
+  component "security.h" <<internal>> as sec_h
+    note left of sec_h
+    Defines db_security_ret_code_t and
+    security_check(...) interface.
+    Used by ops to interpret LMDB rc
+    and decide SUCCESS / RETRY / FAIL.
+    end note
+  component "security.c" <<internal>> as sec_c
+    note left of sec_c
+    Implements:
+    - LMDB -> errno mapping
+    - safety policy (retry / fail)
+    - mapsize expansion on MDB_MAP_FULL
+    All LMDB error handling flows here
+    before reaching higher layers.
+    end note
+}
+
+sec_c --> sec_h
+
+
+@enduml

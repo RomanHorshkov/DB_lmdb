@@ -10,6 +10,19 @@
 ' - Keep diagrams small and composable; rely on this style for consistency.
 
 !pragma layout smetana
+
+skinparam backgroundColor transparent
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #1F2937
+  FontColor #0F172A
+}
+skinparam note {
+  BackgroundColor #FFFFFF
+  BorderColor #CBD5E1
+  FontColor #0F172A
+}
+
 skinparam shadowing false
 skinparam roundCorner 8
 skinparam backgroundColor #FFFFFF
