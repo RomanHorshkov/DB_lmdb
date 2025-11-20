@@ -35,6 +35,8 @@ int main(void)
                          (const void*)"sample_key", sizeof("sample_key"),
                          (const void*)"sample_value", sizeof("sample_value"));
 
+    rc = db_core_exec_ops();
+
     /* For now just init + shutdown; ops wiring will come next. */
     size_t final_mapsize = db_core_shutdown();
     printf("db_core_shutdown: final mapsize=%zu bytes\n", final_mapsize);

@@ -1,6 +1,7 @@
 .vscode/
 void_store_hold/
 build/
+build-debug/
 demo_db/
 docs/plantuml/generated/
 docs/plantuml/puml/*.png

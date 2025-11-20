@@ -83,7 +83,7 @@ int ops_add_operation(const op_t* operation)
     /* Input check */
 
     /* Check if write op */
-    if(ops_cache.kind != OPS_BATCH_KIND_RW && _op_kind_from_type(&operation->type) == OPS_BATCH_KIND_RW)
+    if(ops_cache.kind == OPS_BATCH_KIND_RO && _op_kind_from_type(&operation->type) == OPS_BATCH_KIND_RW)
     {
         /* Set whole ops batch to write */
         ops_cache.kind = OPS_BATCH_KIND_RW;
@@ -123,9 +123,9 @@ int ops_add_operation(const op_t* operation)
 
 int ops_execute_operations(void)
 {
-    if(!ops_cache.ops || !ops_cache.n_ops == 0)
+    if(!ops_cache.ops || ops_cache.n_ops == 0)
     {
-        EML_ERROR(LOG_TAG, "ops_exec: invalid input");
+        EML_ERROR(LOG_TAG, "_execute_operations: invalid input");
         return -EINVAL;
     }
 

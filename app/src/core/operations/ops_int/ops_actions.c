@@ -138,7 +138,7 @@ db_security_ret_code_t act_put(MDB_txn* txn, op_t* op, int* const out_err)
     /* Put val */
     /* DO NOT add MDB_RESERVE here */
     /* Use the put flags in the Database */
-    int mdb_res = mdb_put(txn, op->dbi, k_ptr, v_ptr, dbi->put_flags);
+    int mdb_res = mdb_put(txn, dbi->dbi, k_ptr, v_ptr, dbi->put_flags);
     if(mdb_res != MDB_SUCCESS) return security_check(mdb_res, txn, NULL);
     return DB_SAFETY_SUCCESS;
 
