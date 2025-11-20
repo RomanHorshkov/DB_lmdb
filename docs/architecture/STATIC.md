@@ -11,6 +11,12 @@ This document captures the structural view of the LMDB wrapper around `db_lmdb_*
 
 ![Static packages](../plantuml/generated/static_architecture.svg)
 
+### DB package (core/operations/db)
+
+Dedicated view of the `db` package and its internal DBI types:
+
+![DB package](../plantuml/generated/db_package.svg)
+
 ### Reading the arrows
 - Direction means "depends on" (e.g., `db_lmdb.h` depends on `db_lmdb_core.c`).
 - Public callers only see `db_lmdb.h` and `db.h`; `db.h` pulls in `dbi.h` so DBI structs are part of the public contract without leaking C-file internals.

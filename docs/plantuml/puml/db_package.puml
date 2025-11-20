@@ -1,0 +1,48 @@
+@startuml
+!include base.puml
+
+title DB package — db.h, dbi_int.h, dbi_ext.h
+
+' Transparent canvas, but keep boxes readable.
+skinparam backgroundColor transparent
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #1F2937
+  FontColor #0F172A
+}
+skinparam note {
+  BackgroundColor #FFFFFF
+  BorderColor #CBD5E1
+  FontColor #0F172A
+}
+
+package "DB headers" {
+  component "db.h" as db_h
+  component "dbi_int.h" as dbi_int
+  component "dbi_ext.h" as dbi_ext
+}
+
+component "lmdb.h" as lmdb
+
+db_h --> dbi_int
+dbi_int --> dbi_ext
+db_h --> lmdb
+
+note right of db_h
+Main LMDB DB struct (DataBase_t)
+and global DataBase handle DataBase.
+Includes dbi_int.h and lmdb.h;
+initialized / torn down by the core layer.
+end note
+
+note right of dbi_int
+Descriptor for opened DBIs (dbi_t array),
+exposed via db.h and using dbi_ext.h types.
+end note
+
+note right of dbi_ext
+Logical DBI kinds (dbi_type_t)
+for default / DUPSORT / DUPFIXED.
+end note
+
+@enduml
