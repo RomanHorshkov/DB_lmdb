@@ -1,7 +1,7 @@
 
-
+#include <stddef.h>      /* NULL */
 #include "ops_actions.h"
-
+#include "common.h"      /* EML_* macros, LMDB_EML_* */
 
 /****************************************************************************
  * PRIVATE DEFINES

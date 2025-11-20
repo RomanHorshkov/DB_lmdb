@@ -1,2 +1,4 @@
 .vscode/
 void_store_hold/
+build/
+demo_db/

@@ -42,7 +42,7 @@ typedef struct
  */
 
 /* Global DB handle */
-DataBase_t* DataBase;
+extern DataBase_t* DataBase;
 
 /****************************************************************************
  * PUBLIC VARIABLES 

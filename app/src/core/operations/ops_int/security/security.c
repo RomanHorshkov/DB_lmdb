@@ -48,7 +48,8 @@
 
 #include <errno.h>
 
-#include "db.h" /* DB, DataBase, common, stddef, stdintm, lmdb  */
+#include "db.h"     /* DB, DataBase, lmdb  */
+#include "common.h" /* EML_* macros, LMDB_EML_* */
 
 /****************************************************************************
  * PRIVATE DEFINES

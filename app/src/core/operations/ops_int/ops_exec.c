@@ -3,8 +3,11 @@
  * 
  */
 
+#include <string.h>      /* memset */
+
 #include "ops_exec.h"
 #include "ops_actions.h"
+#include "common.h"      /* EML_* macros, LMDB_EML_* */
 
 /****************************************************************************
  * PRIVATE DEFINES
@@ -80,7 +83,7 @@ int ops_add_operation(const op_t* operation)
     /* Input check */
 
     /* Check if write op */
-    if(ops_cache.kind != OPS_BATCH_KIND_RW && _op_kind_from_type(operation->type) == OPS_BATCH_KIND_RW)
+    if(ops_cache.kind != OPS_BATCH_KIND_RW && _op_kind_from_type(&operation->type) == OPS_BATCH_KIND_RW)
     {
         /* Set whole ops batch to write */
         ops_cache.kind = OPS_BATCH_KIND_RW;
@@ -95,7 +98,7 @@ int ops_add_operation(const op_t* operation)
      */
     if(operation->key.kind == OP_KEY_KIND_LOOKUP && operation->key.lookup.op_index > ops_cache.n_ops)
     {
-        EML_ERROR(LOG_TAG, "ops_add_operation: invalid key lookup index %u (n_ops=%u)",
+        EML_ERROR(LOG_TAG, "ops_add_operation: invalid key lookup index %u (n_ops=%zu)",
                   operation->key.lookup.op_index, ops_cache.n_ops);
         return -EINVAL;
     }
@@ -199,7 +202,7 @@ done:
 
 fail:
     /* wipe the cache */
-    memset(ops_cache, 0, sizeof(batch_t));
+    memset(&ops_cache, 0, sizeof(batch_t));
     return res;
 }
 

@@ -8,10 +8,6 @@
 
 #include "dbi_ext.h" /* dbi_type_t */
 
-#include "ops_actions.h"
-#include "ops_exec.h"
-#include "ops_init.h"
-
 
 #ifdef __cplusplus
 extern "C"
@@ -44,17 +40,6 @@ typedef enum
     DB_OPERATION_DEL,      /**< Delete by key or (key, dup-value). */
     DB_OPERATION_MAX
 } op_type_t;
-
-
-
-
-
-
-
-
-
-
-
 
 
 

@@ -5,6 +5,7 @@
 #ifndef DB_OPERATIONS_OPS_INTERNALS_H_
 #define DB_OPERATIONS_OPS_INTERNALS_H_
 
+#include <stddef.h>   /* size_t */
 #include "ops_facade.h"
 #include "security.h" /* db_security_ret_code_t */
 #include "db.h"       /* MDB_txn etc */
@@ -44,7 +45,7 @@ typedef enum
     OP_KEY_SRC_VAL = 1  /**< key is from some prev operation's value */
 } op_key_source_t;
 
-typedef struct
+typedef struct op_t
 {
     op_key_source_t src_type; /**< Source type (key or value). */
     unsigned int    op_index; /**< Index of the operation to source key from. */

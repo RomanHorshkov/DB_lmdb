@@ -9,7 +9,9 @@
 #ifndef DB_LMDB_CORE_H
 #define DB_LMDB_CORE_H
 
-// #include "ops_facade.h" /* op_type_t */
+#include <stddef.h>           /* size_t */
+#include "dbi_ext.h"          /* dbi_type_t */
+#include "operations/ops_facade.h" /* op_type_t */
 
 #ifdef __cplusplus
 extern "C"
@@ -20,6 +22,12 @@ extern "C"
  * PUBLIC DEFINES
  ****************************************************************************
 */
+/* None */
+
+/****************************************************************************
+ * PUBLIC STRUCTURED TYPES
+ ****************************************************************************
+ */
 /* None */
 
 /****************************************************************************
@@ -39,16 +47,50 @@ extern "C"
  * @param path       Filesystem path to the database directory.
  * @param mode       Filesystem mode (owner/group/other bits) used when
  *                   creating directories or files.
- * @param init_dbis  Array of DBI initialization descriptors.
+ * @param dbi_names  Array of NUL-terminated DBI names.
+ * @param dbi_types  Array of dbi_type_t values matching @p dbi_names.
  * @param n_dbis     Number of entries in the @p init_dbis array.
  * @return 0 on success; negative POSIX-style errno on failure.
  */
-int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
+int db_core_init(const char* const path, const unsigned int mode,
+                 const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis);
 
-int db_core_op_add(const unsigned int dbi_idx, const op_type_t op_type, const op_key_t* key, const op_key_t* val);
+/**
+ * @brief Queue a single database operation into the current batch.
+ *
+ * The operation is described using simple C types; the core converts
+ * it into an internal op_t and caches it until @ref db_core_exec_ops
+ * is called.
+ *
+ * For now only DB_OPERATION_PUT and DB_OPERATION_GET are supported; other
+ * values will return -EINVAL.
+ *
+ * The data pointers in @p key and @p val must remain valid until
+ * after db_core_exec_ops has been called.
+ *
+ * @param dbi_idx  Index of the target DBI (0-based).
+ * @param type     Operation kind (DB_OPERATION_*).
+ * @param key_data Pointer to key bytes.
+ * @param key_size Size of key buffer in bytes.
+ * @param val_data Pointer to value bytes (for PUT).
+ * @param val_size Size of value buffer in bytes (for PUT).
+ * @return 0 on success, negative errno-style code on failure.
+ */
+int db_core_add_op(unsigned dbi_idx, op_type_t type,
+                   const void* key_data, size_t key_size,
+                   const void* val_data, size_t val_size);
 
-int core_db_op_execute(/* TODO params */);
+/**
+ * @brief Execute all queued operations as a single batch.
+ *
+ * This function delegates to the internal ops execution engine which
+ * groups operations into an LMDB transaction and applies retry /
+ * safety policy.
+ *
+ * @return 0 on success; negative errno-style code on failure.
+ */
+int db_core_exec_ops(void);
 
 /**
  * @brief Gracefully shut down the LMDB environment and free DB resources.

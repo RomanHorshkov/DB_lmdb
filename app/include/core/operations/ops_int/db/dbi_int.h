@@ -46,7 +46,8 @@ typedef struct
  * PUBLIC FUNCTION PROTOTYPES
  ****************************************************************************
 */
-/* None */
+unsigned dbi_open_flags_from_type(dbi_type_t type);
+unsigned dbi_desc_default_put_flags(unsigned db_flags);
 
 #ifdef __cplusplus
 }

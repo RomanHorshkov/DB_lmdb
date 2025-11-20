@@ -1,5 +1,7 @@
 
-#include "ops_setup.h" /* op_t etc */
+#include <errno.h>     /* EINVAL etc */
+#include "ops_init.h"  /* env/DBI init helpers */
+#include "common.h"    /* EML_* macros, LMDB_EML_* */
 
 /************************************************************************
  * PRIVATE DEFINES

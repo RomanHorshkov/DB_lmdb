@@ -25,10 +25,10 @@ extern "C"
 
 /* Log LMDB ret with a stable format */
 #define LMDB_EML_ERR(tag, where, ret) \
-    EML_ERROR("%s", "%s: ret=%d (%s)", tag, where, (ret), mdb_strerror(ret))
+    EML_ERROR(tag, "%s: ret=%d (%s)", where, (ret), mdb_strerror(ret))
 
 #define LMDB_EML_WARN(tag, where, ret) \
-    EML_WARN("%s", "%s: ret=%d (%s)", tag, where, (ret), mdb_strerror(ret))
+    EML_WARN(tag, "%s: ret=%d (%s)", where, (ret), mdb_strerror(ret))
 
 /****************************************************************************
  * PUBLIC STRUCTURED VARIABLES

@@ -2,8 +2,22 @@
  * @file db_lmdb_core.c
  */
 
+#include <errno.h>       /* EINVAL, ENOMEM, EALREADY */
+#include <stdint.h>      /* uint8_t */
+#include <stdlib.h>      /* calloc, free */
+
 #include "core.h"
-#include "ops_facade.h"
+#include "common.h"        /* EML_* macros, LMDB_EML_* */
+#include "db.h"            /* DataBase_t, MDB_envinfo */
+#include "dbi_int.h"       /* dbi_t */
+#include "ops_init.h"      /* ops_init_env, ops_init_dbi */
+#include "ops_actions.h"   /* act_txn_begin, act_txn_commit */
+#include "ops_exec.h"      /* ops_add_operation, ops_execute_operations */
+#include "ops_internals.h" /* op_t, op_key_t, op_type_t */
+#include "ops_facade.h"    /* DB_OPERATION_* */
+
+/* Definition of the global DB handle declared in db.h */
+DataBase_t* DataBase = NULL;
 
 /************************************************************************
  * PRIVATE DEFINES
@@ -41,7 +55,8 @@
  ****************************************************************************
  */
 
-int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* init_dbis,
+int db_core_init(const char* const path, const unsigned int mode,
+                 const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {
     if(DataBase)
@@ -51,7 +66,7 @@ int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* in
     }
 
     /* Check input */
-    if(!path || !(*path) || !init_dbis || n_dbis == 0)
+    if(!path || !(*path) || !dbi_names || !dbi_types || n_dbis == 0)
     {
         EML_ERROR(LOG_TAG, "_init_db: invalid input");
         return -EINVAL;
@@ -72,7 +87,17 @@ int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* in
 
     /* Set max map size */
     new_DataBase->map_size_bytes_max = (size_t)DB_MAP_SIZE_MAX;
-    
+
+    /* Allocate DBI descriptor array */
+    new_DataBase->dbis = calloc(n_dbis, sizeof(dbi_t));
+    if(!new_DataBase->dbis)
+    {
+        EML_ERROR(LOG_TAG, "_init_db: calloc(dbis) failed");
+        free(new_DataBase);
+        return -ENOMEM;
+    }
+    new_DataBase->n_dbis = n_dbis;
+
     /* Set the global handle */
     DataBase = new_DataBase;
 
@@ -98,23 +123,25 @@ int db_core_init(const char* const path, const unsigned int mode, dbi_init_t* in
             goto fail;
     }
 
-    /* Initialize all requested dbis */
-    for(size_t i = 0; i < (size_t)n_dbis; i++)
+    /* Initialize all requested DBIs */
+    for(unsigned i = 0; i < n_dbis; ++i)
     {
-        if(!&init_dbis[i])
+        const char*     name = dbi_names[i];
+        const dbi_type_t type = dbi_types[i];
+
+        if(!name || !(*name))
         {
-            EML_ERROR(LOG_TAG, "_init_db: invalid dbi_init_t at index %zu", i);
+            EML_ERROR(LOG_TAG, "_init_db: invalid dbi name at index %u", i);
             out_err_val = -EINVAL;
             goto fail;
         }
 
-        dbi_init_t* init_dbi = &init_dbis[i];
-        switch(ops_init_dbi(txn, init_dbi->name, init_dbi->dbi_idx, init_dbi->type, out_err))
+        switch(ops_init_dbi(txn, name, i, type, out_err))
         {
             case DB_SAFETY_SUCCESS:
                 break;
             default:
-                EML_ERROR(LOG_TAG, "_init_db: _init_dbi failed for dbi %s, err=%d", init_dbi->name,
+                EML_ERROR(LOG_TAG, "_init_db: _init_dbi failed for dbi %s, err=%d", name,
                           (out_err) ? *out_err : -1);
                 goto fail;
         }
@@ -136,16 +163,62 @@ fail:
     return out_err_val;
 }
 
-int db_core_op_add(const unsigned int dbi_idx, const op_type_t op_type, const op_key_t* key, const op_key_t* val)
+int db_core_add_op(unsigned dbi_idx, op_type_t type,
+                   const void* key_data, size_t key_size,
+                   const void* val_data, size_t val_size)
 {
-    /* Create here an op_t on the fly definition to deep-copy dbi and type,
-    and shallow copy key and val, coming from the caller, who is respondible
-    for the lifetime of the ptrs. */
-    
-    return ops_add_operation(&(op_t){.dbi = dbi_idx, .type = op_type, .key = *key, .val = *val});
+    /* Validate global DB and DBI index */
+    if(!DataBase || !DataBase->dbis || dbi_idx >= DataBase->n_dbis)
+    {
+        EML_ERROR(LOG_TAG, "db_core_add_op: invalid db/dbi (db=%p idx=%u n_dbis=%zu)",
+                  (void*)DataBase, dbi_idx, DataBase ? DataBase->n_dbis : 0);
+        return -EINVAL;
+    }
+
+    /* Validate operation type: for now only PUT/GET are supported. */
+    if(type != DB_OPERATION_PUT && type != DB_OPERATION_GET)
+    {
+        EML_ERROR(LOG_TAG, "db_core_add_op: unsupported op type=%d", type);
+        return -EINVAL;
+    }
+
+    /* Validate key buffer */
+    if(!key_data || key_size == 0)
+    {
+        EML_ERROR(LOG_TAG, "db_core_add_op: invalid key buffer");
+        return -EINVAL;
+    }
+
+    /* Build op_key_t descriptors */
+    op_key_t key_desc = {0};
+    key_desc.kind         = OP_KEY_KIND_PRESENT;
+    key_desc.present.size = key_size;
+    key_desc.present.ptr  = (void*)key_data; /* safe: ops layer treats as read-only */
+
+    op_key_t val_desc = {0};
+    if(type == DB_OPERATION_PUT)
+    {
+        if(!val_data || val_size == 0)
+        {
+            EML_ERROR(LOG_TAG, "db_core_add_op: invalid value buffer for PUT");
+            return -EINVAL;
+        }
+        val_desc.kind         = OP_KEY_KIND_PRESENT;
+        val_desc.present.size = val_size;
+        val_desc.present.ptr  = (void*)val_data;
+    }
+
+    /* Assemble operation */
+    op_t op;
+    op.dbi  = dbi_idx;
+    op.type = type;
+    op.key  = key_desc;
+    op.val  = val_desc;
+
+    return ops_add_operation(&op);
 }
 
-int core_db_op_exec(/* TODO params */)
+int db_core_exec_ops(void)
 {
     return ops_execute_operations();
 }
