@@ -7,6 +7,7 @@ on:
     branches:
       - main
       - master
+      - server_adaptation
     paths:
       - 'app/**'
       - 'tests/benchmarks/**'
@@ -48,4 +49,3 @@ jobs:
         with:
           name: bench-results
           path: tests/benchmarks/results
-
