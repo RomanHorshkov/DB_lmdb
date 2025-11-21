@@ -27,19 +27,110 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 **Output**:
 
 - Console: System info + summary statistics
-- File: `results/bench_db_init_results.txt` with complete system information and all iteration timings
+- Files:
+  - `results/bench_db_init_results_1dbi.txt`
+  - `results/bench_db_init_results_10dbis.txt`
+  Each contains complete system information and all iteration timings for its configuration.
 
 **Running**:
 
 ```bash
 # Using the convenience script
-./utils/run_bench.sh
+./utils/bench/create_db.sh
 
 # Or directly
 ./build/bench_db_init
 
 # With custom output file
 ./build/bench_db_init /path/to/custom/output.txt
+```
+
+### bench_db_ops_batch - PUT Operations Benchmark (single vs batched)
+
+**Purpose**: Compares inserting 1000 user records into a single sub-DBI:
+
+- Non-batched: one `PUT` per `db_core_exec_ops` call
+- Batched: groups of 8 `PUT`s per `db_core_exec_ops`
+
+**What is measured**:
+
+- ONLY the time spent in `db_core_add_op` + `db_core_exec_ops`
+- Database environment/DBI creation and shutdown are excluded
+- Each run starts from a completely clean database directory
+
+**Configuration**:
+
+- Users per run: 1000
+- Value size: 1024 bytes
+- Batch sizes:
+  - 1 (non-batched)
+  - 8 (batched)
+- Runs per pattern: 10
+- Sub-DBIs: 1
+- Database path: `/tmp/bench_lmdb_ops`
+
+**Output**:
+
+- Console: System info + summary statistics for each pattern
+- Files:
+  - `results/bench_put_users_single.txt`
+  - `results/bench_put_users_batch8.txt`
+  Each contains system information, per-run totals and per-operation statistics.
+
+**Running**:
+
+```bash
+# Using the convenience script
+./utils/bench/write_db.sh
+
+# Or directly
+./build/bench_db_ops_batch
+```
+
+### bench_db_get_batch - GET Operations Benchmark (single vs batched)
+
+**Purpose**: Compares fetching random user records from a single sub-DBI:
+
+- Non-batched: one `GET` per `db_core_exec_ops` call
+- Batched: groups of 8 `GET`s per `db_core_exec_ops`
+
+**What is measured**:
+
+- ONLY the time spent in `db_core_add_op` + `db_core_exec_ops` for GET operations
+- Database environment/DBI creation, initial population, and shutdown are excluded
+- Each run starts from a completely clean database directory, then:
+  - Initializes environment + one DBI
+  - Populates 1000 key/value pairs (not timed)
+  - Executes the GET workload (timed)
+
+**Configuration**:
+
+- Users stored: 1000
+- Value size: 1024 bytes
+- GETs per run: 1000
+- Batch sizes:
+  - 1 (non-batched)
+  - 8 (batched)
+- Runs per pattern: 10
+- Sub-DBIs: 1
+- Database path: `/tmp/bench_lmdb_get`
+
+**Output**:
+
+- Console: System info + summary statistics for each pattern
+- Files:
+  - `results/bench_get_users_single.txt`
+  - `results/bench_get_users_batch8.txt`
+  Each contains system information, per-run totals and per-operation statistics.
+
+**Running**:
+
+```bash
+# Using the convenience script
+./utils/bench/read_db.sh
+
+# Or directly
+./build/bench_db_get_batch
 ```
 
 ## Results Format

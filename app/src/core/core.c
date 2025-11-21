@@ -303,13 +303,8 @@ int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key
 
 int db_core_exec_ops(void)
 {
-    EML_INFO(LOG_TAG, "db_core_exec_ops: executing queued operations");
     int rc = ops_execute_operations();
-    if(rc == 0)
-    {
-        EML_INFO(LOG_TAG, "db_core_exec_ops: batch completed successfully");
-    }
-    else
+    if(rc != 0)
     {
         EML_ERROR(LOG_TAG, "db_core_exec_ops: batch failed, rc=%d", rc);
     }

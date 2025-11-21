@@ -238,3 +238,33 @@ target_link_libraries(bench_db_init
         db_core
         m  # Math library for sqrt()
 )
+
+add_executable(bench_db_ops_batch
+    tests/benchmarks/bench_db_ops_batch.c
+)
+
+target_include_directories(bench_db_ops_batch
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+)
+
+target_link_libraries(bench_db_ops_batch
+    PRIVATE
+        db_core
+        m  # Math library for sqrt()
+)
+
+add_executable(bench_db_get_batch
+    tests/benchmarks/bench_db_get_batch.c
+)
+
+target_include_directories(bench_db_get_batch
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+)
+
+target_link_libraries(bench_db_get_batch
+    PRIVATE
+        db_core
+        m  # Math library for sqrt()
+)

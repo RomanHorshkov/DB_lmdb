@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
 #
-# run_bench.sh - Run database benchmarks
+# run_bench2.sh - Run batched vs non-batched PUT benchmark
 #
-# This script builds and executes database benchmarks.
+# This script builds and executes the bench_db_ops_batch benchmark.
 # Results are stored in tests/benchmarks/results/
 #
 
 set -euo pipefail
 
+# Resolve repository root (two levels up from this script).
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 # Configuration
-BUILD_DIR="${BUILD_DIR:-build}"
-BENCHMARK="${BENCHMARK:-bench_db_init}"
-RESULTS_DIR="tests/benchmarks/results"
+BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
+BENCHMARK="${BENCHMARK:-bench_db_ops_batch}"
+RESULTS_DIR="${ROOT_DIR}/tests/benchmarks/results"
 
 echo "========================================"
-echo "Database Benchmark Runner"
+echo "Database PUT Benchmark Runner"
 echo "========================================"
 echo
 
@@ -23,7 +26,7 @@ if [ ! -x "${BUILD_DIR}/${BENCHMARK}" ]; then
     echo "Benchmark executable not found. Building..."
     if [ ! -f "${BUILD_DIR}/Makefile" ]; then
         echo "Build directory not configured. Running build.sh..."
-        ./utils/build.sh
+        "${ROOT_DIR}/utils/build.sh"
     else
         echo "Building benchmark target..."
         make -C "${BUILD_DIR}" "${BENCHMARK}"
