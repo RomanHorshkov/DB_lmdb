@@ -156,13 +156,58 @@ target_link_libraries(db_core_ut_dbi_int
         cmocka_db_core::cmocka
 )
 
+add_executable(db_core_ut_ops_init
+    tests/UT/UT_ops_init.c
+    tests/UT/ut_env.c
+    app/src/core/operations/ops_int/db/dbi_int.c
+    app/src/core/operations/ops_int/security/security.c
+)
+
+target_include_directories(db_core_ut_ops_init
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/db
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/security
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/external/EMlog/app/include
+)
+
+target_link_libraries(db_core_ut_ops_init
+    PRIVATE
+        cmocka_db_core::cmocka
+)
+
 if(DB_LMDB_ENABLE_UT_COVERAGE)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(db_core_ut_security PRIVATE --coverage -O2 -g)
         target_link_options(db_core_ut_security PRIVATE --coverage)
         target_compile_options(db_core_ut_dbi_int PRIVATE --coverage -O2 -g)
         target_link_options(db_core_ut_dbi_int PRIVATE --coverage)
+        target_compile_options(db_core_ut_ops_init PRIVATE --coverage -O2 -g)
+        target_link_options(db_core_ut_ops_init PRIVATE --coverage)
     else()
         message(WARNING "DB_LMDB_ENABLE_UT_COVERAGE requested but compiler does not support --coverage")
     endif()
 endif()
+
+# ---------------------------------------------------------------------------
+# Benchmarks
+# ---------------------------------------------------------------------------
+
+add_executable(bench_db_init
+    tests/benchmarks/bench_db_init.c
+)
+
+target_include_directories(bench_db_init
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+)
+
+target_link_libraries(bench_db_init
+    PRIVATE
+        db_core
+        m  # Math library for sqrt()
+)

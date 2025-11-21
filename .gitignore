@@ -8,3 +8,5 @@ docs/plantuml/puml/*.png
 docs/plantuml/puml/*.svg
 build*
 tests/UT/results/
+tests/IT/results/
+tests/benchmarks/results/

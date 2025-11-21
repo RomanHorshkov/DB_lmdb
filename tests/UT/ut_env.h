@@ -27,17 +27,35 @@ char* mdb_strerror(int err);
 void  mdb_txn_abort(MDB_txn* txn);
 int   mdb_env_info(MDB_env* env, MDB_envinfo* stat);
 int   mdb_env_set_mapsize(MDB_env* env, size_t size);
+int   mdb_env_create(MDB_env** env);
+void  mdb_env_close(MDB_env* env);
+int   mdb_env_set_maxdbs(MDB_env* env, MDB_dbi dbs);
+int   mdb_env_open(MDB_env* env, const char* path, unsigned int flags, mdb_mode_t mode);
+int   mdb_dbi_open(MDB_txn* txn, const char* name, unsigned int flags, MDB_dbi* dbi);
+int   mdb_dbi_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* flags);
 
 /* Hook points so individual tests can override LMDB behavior without
  * having to redefine symbols. When these function pointers are NULL a
  * reasonable default stub behavior is used. */
-typedef int (*ut_mdb_env_info_fn)(MDB_env* env, MDB_envinfo* stat);
-typedef int (*ut_mdb_env_set_mapsize_fn)(MDB_env* env, size_t size);
+typedef int  (*ut_mdb_env_info_fn)(MDB_env* env, MDB_envinfo* stat);
+typedef int  (*ut_mdb_env_set_mapsize_fn)(MDB_env* env, size_t size);
 typedef void (*ut_mdb_txn_abort_fn)(MDB_txn* txn);
+typedef int  (*ut_mdb_env_create_fn)(MDB_env** env);
+typedef void (*ut_mdb_env_close_fn)(MDB_env* env);
+typedef int  (*ut_mdb_env_set_maxdbs_fn)(MDB_env* env, MDB_dbi dbs);
+typedef int  (*ut_mdb_env_open_fn)(MDB_env* env, const char* path, unsigned int flags, mdb_mode_t mode);
+typedef int  (*ut_mdb_dbi_open_fn)(MDB_txn* txn, const char* name, unsigned int flags, MDB_dbi* dbi);
+typedef int  (*ut_mdb_dbi_flags_fn)(MDB_txn* txn, MDB_dbi dbi, unsigned int* flags);
 
-extern ut_mdb_env_info_fn       g_ut_mdb_env_info;
-extern ut_mdb_env_set_mapsize_fn g_ut_mdb_env_set_mapsize;
-extern ut_mdb_txn_abort_fn      g_ut_mdb_txn_abort;
+extern ut_mdb_env_info_fn         g_ut_mdb_env_info;
+extern ut_mdb_env_set_mapsize_fn  g_ut_mdb_env_set_mapsize;
+extern ut_mdb_txn_abort_fn        g_ut_mdb_txn_abort;
+extern ut_mdb_env_create_fn       g_ut_mdb_env_create;
+extern ut_mdb_env_close_fn        g_ut_mdb_env_close;
+extern ut_mdb_env_set_maxdbs_fn   g_ut_mdb_env_set_maxdbs;
+extern ut_mdb_env_open_fn         g_ut_mdb_env_open;
+extern ut_mdb_dbi_open_fn         g_ut_mdb_dbi_open;
+extern ut_mdb_dbi_flags_fn        g_ut_mdb_dbi_flags;
 
 /* Reset all LMDB stub hooks back to their defaults. */
 void ut_reset_lmdb_stubs(void);
