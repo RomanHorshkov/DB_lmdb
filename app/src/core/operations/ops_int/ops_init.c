@@ -1,6 +1,9 @@
 
 #include "ops_init.h" /* env/DBI init helpers */
 #include <errno.h>    /* EINVAL etc */
+#include <sys/stat.h> /* mkdir, stat */
+#include <sys/types.h>
+#include <unistd.h>
 #include "common.h"   /* EML_* macros, LMDB_EML_* */
 
 /************************************************************************
@@ -214,6 +217,18 @@ db_security_ret_code_t _dbi_open(MDB_txn* const txn, const unsigned int dbi_idx,
 db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi_idx,
                                       int* const out_err);
 
+/**
+ * @brief Ensure that the LMDB directory exists with restrictive permissions.
+ *
+ * The directory is created when missing with owner-only permissions
+ * (0700). When it already exists, the function verifies that it is a
+ * directory and that no group/other bits are set; it does not relax
+ * permissions if they are tighter.
+ *
+ * @return 0 on success, negative errno-style value on failure.
+ */
+static int _ensure_env_dir(const char* path);
+
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
@@ -400,6 +415,15 @@ db_security_ret_code_t _db_open_env(const char* const path, const unsigned int m
         return DB_SAFETY_FAIL;
     }
 
+    /* Ensure the environment directory exists with strict permissions. */
+    int dir_rc = _ensure_env_dir(path);
+    if(dir_rc != 0)
+    {
+        if(out_err) *out_err = dir_rc;
+        EML_ERROR(LOG_TAG, "_open_env: failed to prepare directory %s (rc=%d)", path, dir_rc);
+        return DB_SAFETY_FAIL;
+    }
+
     /* Open environment */
     int mdb_res = mdb_env_open(DataBase->env, path, 0, mode);
     if(mdb_res != 0) goto fail;
@@ -451,4 +475,51 @@ db_security_ret_code_t _dbi_get_flags(MDB_txn* const txn, const unsigned int dbi
 fail:
     LMDB_EML_ERR(LOG_TAG, "_dbi_get_flags failed", mdb_res);
     return security_check(mdb_res, txn, out_err);
+}
+
+static int _ensure_env_dir(const char* path)
+{
+    struct stat st;
+    mode_t      dir_mode = (mode_t)0700; /* owner rwx, no group/other */
+
+    if(stat(path, &st) == 0)
+    {
+        /* Path exists: ensure it is a directory and not world-accessible. */
+        if(!S_ISDIR(st.st_mode))
+        {
+            EML_ERROR(LOG_TAG, "_ensure_env_dir: %s exists and is not a directory", path);
+            return -ENOTDIR;
+        }
+
+        if((st.st_mode & (S_IRWXG | S_IRWXO)) != 0)
+        {
+            EML_ERROR(LOG_TAG,
+                      "_ensure_env_dir: %s has too-permissive mode (%o); group/other bits must be 0",
+                      path,
+                      st.st_mode);
+            return -EACCES;
+        }
+
+        return 0;
+    }
+
+    if(errno != ENOENT)
+    {
+        int saved = errno;
+        EML_ERROR(LOG_TAG, "_ensure_env_dir: stat(%s) failed, errno=%d", path, saved);
+        return -saved;
+    }
+
+    /* Directory does not exist: create it with strict permissions. */
+    if(mkdir(path, dir_mode) != 0)
+    {
+        int saved = errno;
+        EML_ERROR(LOG_TAG, "_ensure_env_dir: mkdir(%s, %o) failed, errno=%d",
+                  path,
+                  dir_mode,
+                  saved);
+        return -saved;
+    }
+
+    return 0;
 }

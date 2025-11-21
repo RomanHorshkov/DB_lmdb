@@ -95,7 +95,7 @@
  *       convention. Callers that expect the positive `errno` should negate
  *       the return value.
  */
-int _map_mdb_err_to_errno(int rc);
+static int _map_mdb_err_to_errno(int rc);
 
 /**
  * @brief Attempt to expand the LMDB environment's map size.
@@ -114,7 +114,7 @@ int _map_mdb_err_to_errno(int rc);
  *         code returned by `mdb_env_set_mapsize()` (positive LMDB rc), or a
  *         negative POSIX-style code when `DataBase`/`env` is invalid.
  */
-int _expand_env_mapsize(void);
+static int _expand_env_mapsize(void);
 
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
@@ -177,7 +177,7 @@ db_security_ret_code_t security_check(const int mdb_rc, MDB_txn* const txn, int*
  ****************************************************************************
  */
 
-int _map_mdb_err_to_errno(int rc)
+static int _map_mdb_err_to_errno(int rc)
 {
     if(rc == MDB_SUCCESS) return 0;
 
@@ -226,7 +226,7 @@ int _map_mdb_err_to_errno(int rc)
     }
 }
 
-int _expand_env_mapsize(void)
+static int _expand_env_mapsize(void)
 {
     /* Check database min health */
     if(!(DataBase && DataBase->env)) return -EIO;

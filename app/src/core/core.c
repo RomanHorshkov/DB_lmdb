@@ -2,18 +2,18 @@
  * @file db_lmdb_core.c
  */
 
-#include <errno.h>         /* EINVAL, ENOMEM, EALREADY */
-#include <stdint.h>        /* uint8_t */
-#include <stdlib.h>        /* calloc, free */
+#include <errno.h>       /* EINVAL, ENOMEM, EALREADY */
+#include <stdint.h>      /* uint8_t */
+#include <stdlib.h>      /* calloc, free */
 
-#include "common.h"        /* EML_* macros, LMDB_EML_* */
+#include "common.h"      /* EML_* macros, LMDB_EML_* */
 #include "core.h"
-#include "db.h"            /* DataBase_t, MDB_envinfo */
-#include "dbi_int.h"       /* dbi_t */
-#include "ops_actions.h"   /* act_txn_begin, act_txn_commit */
-#include "ops_exec.h"      /* ops_add_operation, ops_execute_operations */
-#include "ops_facade.h"    /* DB_OPERATION_* */
-#include "ops_init.h"      /* ops_init_env, ops_init_dbi */
+#include "db.h"          /* DataBase_t, MDB_envinfo */
+#include "dbi_int.h"     /* dbi_t */
+#include "ops_actions.h" /* act_txn_begin, act_txn_commit */
+#include "ops_exec.h"    /* ops_add_operation, ops_execute_operations */
+#include "ops_facade.h"  /* DB_OPERATION_* */
+#include "ops_init.h"    /* ops_init_env, ops_init_dbi */
 #include "ops_internals.h" /* op_t, op_key_t, op_type_t */
 
 /* Definition of the global DB handle declared in db.h */
@@ -40,25 +40,12 @@ DataBase_t* DataBase = NULL;
  */
 /* None */
 
-/************************************************************************
- * PRIVATE FUNCTIONS PROTOTYPES
- ****************************************************************************
- */
-
-/****************************************************************************
- * PRIVATE FUNCTIONS DEFINITIONS
- ****************************************************************************
- */
-
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
-int 
-
-
-db_core_init(const char* const path, const unsigned int mode,
+int db_core_init(const char* const path, const unsigned int mode,
                  const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {
@@ -166,6 +153,8 @@ db_core_init(const char* const path, const unsigned int mode,
     return 0;
 
 fail:
+    /* Best-effort cleanup on initialization failure. */
+    (void)db_core_shutdown();
     return out_err_val;
 }
 

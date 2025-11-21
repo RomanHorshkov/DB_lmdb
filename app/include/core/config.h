@@ -32,4 +32,10 @@
 /* operation batch RW cache size */
 #define DB_LMDB_RW_OPS_CACHE_SIZE KiB(2)
 
+/* Default filesystem mode for LMDB environment files (data.mdb/lock.mdb). */
+#define DB_LMDB_ENV_MODE          0600u
+
+/* Default filesystem mode for LMDB environment directory (owner-only). */
+#define DB_LMDB_DIR_MODE          0700u
+
 #endif /* DB_LMDB_CONFIG_H */

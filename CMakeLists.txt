@@ -6,6 +6,9 @@ project(db_lmdb LANGUAGES C)
 # can pick up proper include paths and flags.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(DB_LMDB_ENABLE_IT_COVERAGE "Enable coverage flags for integration tests" OFF)
+option(DB_LMDB_ENABLE_UT_COVERAGE "Enable coverage flags for unit tests" OFF)
+
 # ---------------------------------------------------------------------------
 # External logging library: EMlog
 # Build this first so the rest of the project can link against libemlog.so.
@@ -53,3 +56,88 @@ target_link_libraries(db_core
 # Simple demo executable using the core library.
 add_executable(db_core_demo test.c)
 target_link_libraries(db_core_demo PRIVATE db_core)
+
+# ---------------------------------------------------------------------------
+# Integration tests (cmocka-based) for db_core_init
+# ---------------------------------------------------------------------------
+
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(CMOCKA QUIET cmocka)
+endif()
+
+if(CMOCKA_FOUND)
+    add_library(db_core_cmocka_dep INTERFACE)
+    target_include_directories(db_core_cmocka_dep INTERFACE ${CMOCKA_INCLUDE_DIRS})
+    target_link_libraries(db_core_cmocka_dep INTERFACE ${CMOCKA_LIBRARIES})
+else()
+    find_path(CMOCKA_INCLUDE_DIR cmocka.h)
+    find_library(CMOCKA_LIBRARY NAMES cmocka)
+    if(NOT (CMOCKA_INCLUDE_DIR AND CMOCKA_LIBRARY))
+        message(FATAL_ERROR "cmocka could not be found. Install libcmocka-dev (or equivalent) or set CMOCKA_INCLUDE_DIR / CMOCKA_LIBRARY.")
+    endif()
+    add_library(db_core_cmocka_dep INTERFACE)
+    target_include_directories(db_core_cmocka_dep INTERFACE ${CMOCKA_INCLUDE_DIR})
+    target_link_libraries(db_core_cmocka_dep INTERFACE ${CMOCKA_LIBRARY})
+endif()
+
+add_library(cmocka_db_core::cmocka ALIAS db_core_cmocka_dep)
+
+add_executable(db_core_it_db_core_init
+    tests/IT/IT_core/IT_db_core_init.c
+)
+
+target_include_directories(db_core_it_db_core_init
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+)
+
+target_link_libraries(db_core_it_db_core_init
+    PRIVATE
+        db_core
+        cmocka_db_core::cmocka
+)
+
+if(DB_LMDB_ENABLE_IT_COVERAGE)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(db_core_it_db_core_init PRIVATE --coverage -O2 -g)
+        target_link_options(db_core_it_db_core_init PRIVATE --coverage)
+    else()
+        message(WARNING "DB_LMDB_ENABLE_IT_COVERAGE requested but compiler does not support --coverage")
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# Unit tests (cmocka-based) for security errno mapping
+# ---------------------------------------------------------------------------
+
+add_executable(db_core_ut_security_errno_map
+    tests/UT/UT_security_errno_map.c
+    tests/UT/ut_env.c
+)
+
+target_include_directories(db_core_ut_security_errno_map
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/db
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/security
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/external/EMlog/app/include
+)
+
+target_link_libraries(db_core_ut_security_errno_map
+    PRIVATE
+        cmocka_db_core::cmocka
+)
+
+if(DB_LMDB_ENABLE_UT_COVERAGE)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(db_core_ut_security_errno_map PRIVATE --coverage -O2 -g)
+        target_link_options(db_core_ut_security_errno_map PRIVATE --coverage)
+    else()
+        message(WARNING "DB_LMDB_ENABLE_UT_COVERAGE requested but compiler does not support --coverage")
+    endif()
+endif()

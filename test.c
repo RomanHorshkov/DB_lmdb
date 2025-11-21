@@ -4,6 +4,7 @@
 #include <sys/types.h>
 
 #include "emlog.h"
+#include "core/common.h"
 #include "core.h"
 
 int main(void)
@@ -13,18 +14,11 @@ int main(void)
     /* Initialize EMlogger with debug level and timestamps. */
     emlog_init(EML_LEVEL_DBG, true);
 
-    /* Ensure the LMDB directory exists. */
-    if(mkdir(db_path, 0700) != 0 && errno != EEXIST)
-    {
-        perror("mkdir demo_db");
-        return 1;
-    }
-
     /* Describe a single default DBI via simple arrays. */
     const char*      dbi_names[]  = { "demo_dbi" };
     const dbi_type_t dbi_types[]  = { DBI_TYPE_NOOVERWRITE };
 
-    int rc = db_core_init(db_path, 0600u, dbi_names, dbi_types, 1);
+    int rc = db_core_init(db_path, DB_LMDB_ENV_MODE, dbi_names, dbi_types, 1);
     if(rc != 0)
     {
         fprintf(stderr, "db_core_init failed: %d\n", rc);
