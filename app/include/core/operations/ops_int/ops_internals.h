@@ -31,8 +31,9 @@ extern "C"
  */
 typedef enum
 {
-    OP_KEY_KIND_PRESENT = 0, /**< key is provided */
-    OP_KEY_KIND_LOOKUP  = 1  /**< key is to be looked up from prev op */
+    OP_KEY_KIND_NONE    = 0, /**< uninitialized */
+    OP_KEY_KIND_PRESENT = 1, /**< key is provided */
+    OP_KEY_KIND_LOOKUP  = 2  /**< key is to be looked up from prev op */
 } op_key_kind_t;
 
 /**

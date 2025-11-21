@@ -1,6 +1,7 @@
 
 #include "ops_actions.h"
 #include <stddef.h> /* NULL */
+#include <string.h> /* memset, memcpy */
 #include "common.h" /* EML_* macros, LMDB_EML_* */
 
 /****************************************************************************
@@ -92,7 +93,6 @@ db_security_ret_code_t act_txn_begin(MDB_txn** out_txn, const unsigned flags, in
         EML_ERROR(LOG_TAG, "_txn_begin: mdb_txn_begin failed, mdb_rc=%d", mdb_res);
         return security_check(mdb_res, NULL, out_err);
     }
-    EML_DBG(LOG_TAG, "act_txn_begin: txn begun (flags=0x%x)", flags);
     return DB_SAFETY_SUCCESS;
 }
 
@@ -169,10 +169,42 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
         return DB_SAFETY_FAIL;
     }
 
-    /* Get val: use op->val.present which is layout-compatible with MDB_val. */
-    int mdb_res = mdb_get(txn, op->dbi, k_ptr, (MDB_val*)&op->val.present);
-    if(mdb_res != 0) return security_check(mdb_res, txn, out_err);
+    /* Get immediately the result, then decide what to do with it. */
+    MDB_val tmp_val;
+    int     mdb_res = mdb_get(txn, op->dbi, k_ptr, &tmp_val);
+    if(mdb_res != 0) goto fail;
+
+    /* use op->val.present which is layout-compatible with MDB_val.
+    If the user gave an input value then use another to get the result and copy it */
+    if(op->val.kind == OP_KEY_KIND_PRESENT)
+    {
+        /* check size */
+        if(tmp_val.mv_size > op->val.present.size)
+        {
+            EML_ERROR(LOG_TAG, "_op_get: user buffer too small (buf_size=%zu needed=%zu)",
+                      op->val.present.size, tmp_val.mv_size);
+            return DB_SAFETY_FAIL;
+        }
+
+        /* copy to user buffer */
+        memcpy(op->val.present.ptr, tmp_val.mv_data, tmp_val.mv_size);
+        /* set actual size */
+        op->val.present.size = tmp_val.mv_size;
+    }
+
+    /* If the user gave no buffer, no need to memcpy for return, 
+    just store the reference to result in the key. */
+    else
+    {
+        op->val.kind    = OP_KEY_KIND_PRESENT;
+        /* shallow copy tmp in op's val */
+        op->val.present = *((op_val_t*)&tmp_val);
+    }
+
     return DB_SAFETY_SUCCESS;
+
+fail:
+    return security_check(mdb_res, txn, out_err);
 }
 
 /****************************************************************************
@@ -192,6 +224,8 @@ static MDB_val* _resolve_desc(op_t* base, op_key_t* desc)
 
     switch(desc->kind)
     {
+        case OP_KEY_KIND_NONE:
+            return NULL;
         /* bytes are present in this descriptor */
         case OP_KEY_KIND_PRESENT:
             /**

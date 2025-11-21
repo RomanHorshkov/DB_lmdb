@@ -3,7 +3,7 @@
  * 
  */
 
-#include <string.h> /* memset */
+#include <string.h> /* memset, memcpy */
 
 #include "common.h" /* EML_* macros, LMDB_EML_* */
 #include "ops_actions.h"
@@ -32,15 +32,20 @@ typedef struct
     batch_kind_t kind;                /**< Operations batch kind. */
     op_t         ops[OPS_CACHE_SIZE]; /**< Cached operations. */
     size_t       n_ops;               /**< Number of cached operations. */
+    /* Cache needed for RW get operations:
+    when get, obtain a ptr which after a read is not valid anymore.
+    Thus a necessity to store the get results in a cache arises. */
+    char rw_cache[DB_LMDB_RW_OPS_CACHE_SIZE];
+    /* Number of bytes currently used in rw_cache. */
+    size_t rw_cache_used;
 } batch_t;
-
-batch_t ops_cache;
 
 /****************************************************************************
  * PRIVATE VARIABLES
  ****************************************************************************
  */
-/* None */
+
+batch_t ops_cache;
 
 /****************************************************************************
  * PRIVATE FUNCTIONS PROTOTYPES
@@ -48,8 +53,9 @@ batch_t ops_cache;
  */
 
 static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_err);
+static void*                  _rw_cache_alloc(size_t size);
 
-static inline batch_kind_t _op_kind_from_type(const op_type_t* const type)
+static inline batch_kind_t _batch_type_from_op_type(const op_type_t* const type)
 {
     switch(*type)
     {
@@ -61,13 +67,12 @@ static inline batch_kind_t _op_kind_from_type(const op_type_t* const type)
     }
 }
 
-static inline unsigned int _op_kind_from_op(void)
+static inline unsigned int _txn_type_from_batch_type(void)
 {
     switch(ops_cache.kind)
     {
         case OPS_BATCH_KIND_RO:
             return MDB_RDONLY;
-
         default:
             return 0;
     }
@@ -88,7 +93,7 @@ int ops_add_operation(const op_t* operation)
 
     /* Check if write op */
     if(ops_cache.kind == OPS_BATCH_KIND_RO &&
-       _op_kind_from_type(&operation->type) == OPS_BATCH_KIND_RW)
+       _batch_type_from_op_type(&operation->type) == OPS_BATCH_KIND_RW)
     {
         /* Set whole ops batch to write */
         ops_cache.kind = OPS_BATCH_KIND_RW;
@@ -126,40 +131,26 @@ int ops_add_operation(const op_t* operation)
     return 0;
 }
 
-int ops_execute_operations(void)
+int _exec_rw_ops(void)
 {
-    if(!ops_cache.ops || ops_cache.n_ops == 0)
-    {
-        EML_ERROR(LOG_TAG, "_exec_ops: invalid input");
-        return -EINVAL;
-    }
-
     /* Init retry count and result variable */
     int retry_count = 0;
     int res         = -1;
-
-    /* Determine transaction flags */
-    unsigned int txn_open_flags = _op_kind_from_op();
-
-    EML_DBG(LOG_TAG, "_exec_ops: starting batch of %zu ops (kind=%d)", ops_cache.n_ops,
-            (int)ops_cache.kind);
-
     /* Init transaction */
-    MDB_txn* txn = NULL;
+    MDB_txn* txn    = NULL;
+
 retry:
 {
     /* Check retry */
-    if(retry_count >= DB_LMDB_RETRY_OPS_EXEC)
+    if(retry_count++ >= DB_LMDB_RETRY_OPS_EXEC)
     {
         EML_ERROR(LOG_TAG, "_exec_ops: exceeded max retry count %d", retry_count);
         res = -EIO;
         goto fail;
     }
 
-    /* Increase retry count */
-    retry_count++;
-    /* Begin transaction with correct flags */
-    switch(act_txn_begin(&txn, txn_open_flags, &res))
+    /* Begin transaction with no flags */
+    switch(act_txn_begin(&txn, _txn_type_from_batch_type(), &res))
     {
         case DB_SAFETY_SUCCESS:
             break;
@@ -174,6 +165,11 @@ retry:
     switch(_exec_ops(txn, &res))
     {
         case DB_SAFETY_SUCCESS:
+            /* TODO:
+            If get op, and in rw, need to save the result!!! */
+            /* A few cases here:
+            1) get operation, ptr and buf given by the user,
+            write immediately to user's */
             break;
         case DB_SAFETY_RETRY:
             goto retry;
@@ -182,38 +178,104 @@ retry:
             goto fail;
     }
 
-    /* If RO no commit, if RW commit */
-    switch(txn_open_flags)
+    /* Commit transaction */
+    switch(act_txn_commit(txn, &res))
     {
-        /* ROnly, no commit just abort, fast path */
-        case MDB_RDONLY:
-            mdb_txn_abort(txn);
-            res = 0;
-            EML_DBG(LOG_TAG, "_exec_op: RO txn completed, aborted");
-            goto done;
-
+        case DB_SAFETY_SUCCESS:
+            break;
+        case DB_SAFETY_RETRY:
+            goto retry;
         default:
-            /* Commit transaction */
-            switch(act_txn_commit(txn, &res))
-            {
-                case DB_SAFETY_SUCCESS:
-                    break;
-                case DB_SAFETY_RETRY:
-                    goto retry;
-                default:
-                    EML_ERROR(LOG_TAG, "_exec_op: _txn_commit failed, err=%d", res);
-                    goto fail;
-            }
-            EML_DBG(LOG_TAG, "_exec_op: RW txn committed");
+            EML_ERROR(LOG_TAG, "_exec_op: _txn_commit failed, err=%d", res);
+            goto fail;
+    }
+
+    /* proceed */
+    res = 0;
+    EML_DBG(LOG_TAG, "_exec_ro_ops: RO txn completed, aborted");
+
+}  // retry
+fail:
+    /* wipe the cache */
+    memset(&ops_cache, 0, sizeof(batch_t));
+    return res;
+}
+
+int _exec_ro_ops(void)
+{
+    /* Init retry count and result variable */
+    int retry_count = 0;
+    int res         = -1;
+    /* Init transaction */
+    MDB_txn* txn    = NULL;
+retry:
+{
+    /* Check retry and increase */
+    if(retry_count++ >= DB_LMDB_RETRY_OPS_EXEC)
+    {
+        EML_ERROR(LOG_TAG, "_exec_ro_ops: exceeded max retry count %d", retry_count);
+        res = -EIO;
+        goto fail;
+    }
+
+    /* Begin transaction with RO flags */
+    switch(act_txn_begin(&txn, _txn_type_from_batch_type(), &res))
+    {
+        case DB_SAFETY_SUCCESS:
+            break;
+        case DB_SAFETY_RETRY:
+            goto retry;
+        default:
+            EML_ERROR(LOG_TAG, "_exec_ro_ops: _txn_begin failed, err=%d", res);
+            goto fail;
+    }
+
+    /* Execute all cached operations */
+    switch(_exec_ops(txn, &res))
+    {
+        case DB_SAFETY_SUCCESS:
+            break;
+        case DB_SAFETY_RETRY:
+            goto retry;
+        default:
+            EML_ERROR(LOG_TAG, "_exec_ro_ops failed, err=%d", res);
+            goto fail;
+    }
+
+    /*  Abort txn and proceed */
+    mdb_txn_abort(txn);
+    res = 0;
+    EML_DBG(LOG_TAG, "_exec_ro_ops: RO txn completed, aborted");
+
+}  // retry
+fail:
+    /* wipe the cache */
+    memset(&ops_cache, 0, sizeof(batch_t));
+    return res;
+}
+
+int ops_execute_operations(void)
+{
+    if(ops_cache.n_ops == 0)
+    {
+        EML_ERROR(LOG_TAG, "ops_execute_operations: no ops in cache to execute");
+        return -EINVAL;
+    }
+
+    /* Init result variable */
+    int res = -1;
+    switch(ops_cache.kind)
+    {
+        /* RO ops */
+        case OPS_BATCH_KIND_RO:
+            res = _exec_ro_ops();
+            break;
+        /* RW ops */
+        default:
+            res = _exec_rw_ops();
             break;
     }
 
-}  // retry
-
-done:
-    res = 0;
-
-fail:
     /* wipe the cache */
     memset(&ops_cache, 0, sizeof(batch_t));
     return res;
@@ -231,6 +293,8 @@ static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err)
         switch(_exec_op(txn, &ops_cache.ops[i], out_err))
         {
             case DB_SAFETY_SUCCESS:
+                /* Here, in this case, if the op_batch is RW, I should
+                take the "get" result and copy it inside the buff */
                 break;
             case DB_SAFETY_RETRY:
                 EML_WARN(LOG_TAG, "_exec_op: retry at %u", i);
@@ -245,15 +309,76 @@ static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err)
     return DB_SAFETY_SUCCESS;
 }
 
+/**
+ * @brief Allocate a slice from the RW cache.
+ *
+ * The function advances the internal offset and returns a pointer into
+ * ops_cache.rw_cache, or NULL when there is not enough remaining space.
+ */
+static void* _rw_cache_alloc(size_t size)
+{
+    /* Zero-sized allocations are treated as no-op. */
+    if(size == 0)
+    {
+        return NULL;
+    }
+
+    /* Ensure we do not overflow the fixed cache buffer. */
+    if(size > (DB_LMDB_RW_OPS_CACHE_SIZE - ops_cache.rw_cache_used))
+    {
+        EML_ERROR(LOG_TAG,
+                  "_rw_cache_alloc: insufficient space (requested=%zu used=%zu capacity=%zu)", size,
+                  ops_cache.rw_cache_used, (size_t)DB_LMDB_RW_OPS_CACHE_SIZE);
+        return NULL;
+    }
+
+    char* dst                = ops_cache.rw_cache + ops_cache.rw_cache_used;
+    ops_cache.rw_cache_used += size;
+    return dst;
+}
+
 static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_err)
 {
+    db_security_ret_code_t ret = DB_SAFETY_FAIL;
+
     switch((unsigned int)op->type)
     {
         case DB_OPERATION_PUT:
             return act_put(txn, op, out_err);
 
         case DB_OPERATION_GET:
-            return act_get(txn, op, out_err);
+            ret = act_get(txn, op, out_err);
+            /* If GET failed, propagate the safety decision. */
+            if(ret != DB_SAFETY_SUCCESS) return ret;
+
+            /* In case of RW operation, after a GET, save the result into the cache buffer. */
+            if(ops_cache.kind == OPS_BATCH_KIND_RW)
+            {
+                /* At this point act_get() guarantees PRESENT with a valid pointer/size. */
+                if(!op->val.present.ptr || op->val.present.size == 0)
+                {
+                    EML_ERROR(LOG_TAG,
+                              "_exec_op: GET returned invalid value descriptor (ptr=%p size=%zu)",
+                              op->val.present.ptr, op->val.present.size);
+                    if(out_err) *out_err = -EIO;
+                    return DB_SAFETY_FAIL;
+                }
+
+                void* dst = _rw_cache_alloc(op->val.present.size);
+                if(!dst)
+                {
+                    /* Cache is too small for this value. */
+                    if(out_err) *out_err = -ENOMEM;
+                    return DB_SAFETY_FAIL;
+                }
+
+                /* Copy the obtained value into the RW cache and repoint op->val to it. */
+                memcpy(dst, op->val.present.ptr, op->val.present.size);
+                op->val.present.ptr = dst;
+            }
+
+            /* Value is now stable (either in user buffer or internal cache). */
+            return DB_SAFETY_SUCCESS;
 
             // case DB_OPERATION_REP:
             //     return _op_rep(txn, op);

@@ -156,7 +156,6 @@ db_core_init(const char* const path, const unsigned int mode,
     switch(act_txn_commit(txn, out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_DBG(LOG_TAG, "_init_db: init transaction committed");
             break;
         default:
             EML_PERR(LOG_TAG, "_init_db: _txn_commit failed err=%d", *out_err);
