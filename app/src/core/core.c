@@ -185,31 +185,27 @@ int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_
         return -EINVAL;
     }
 
-    /* Build op_key_t descriptors */
-    op_key_t key_desc     = {0};
-    key_desc.kind         = OP_KEY_KIND_PRESENT;
-    key_desc.present.size = key_size;
-    key_desc.present.ptr  = (void*)key_data; /* safe: ops layer treats as read-only */
-
-    op_key_t val_desc = {0};
-    if(type == DB_OPERATION_PUT)
+    /* Validate value buffer */
+    if(type == DB_OPERATION_PUT && (!val_data || val_size == 0))
     {
-        if(!val_data || val_size == 0)
-        {
-            EML_ERROR(LOG_TAG, "db_core_add_op: invalid value buffer for PUT");
-            return -EINVAL;
-        }
-        val_desc.kind         = OP_KEY_KIND_PRESENT;
-        val_desc.present.size = val_size;
-        val_desc.present.ptr  = (void*)val_data;
+        EML_ERROR(LOG_TAG, "db_core_add_op: invalid value buffer for PUT");
+        return -EINVAL;
     }
 
-    /* Assemble operation */
+    /* Assemble operation, shallow copied into ops cache */
     op_t op;
     op.dbi  = dbi_idx;
     op.type = type;
-    op.key  = key_desc;
-    op.val  = val_desc;
+    op.key  = (op_key_t){ /* Build op_key_t key descriptors */
+        .kind         = OP_KEY_KIND_PRESENT,
+        .present.size = key_size,
+        .present.ptr  = (void*)key_data /* safe: ops layer treats as read-only */
+    };
+    op.val = (op_key_t){ /* Build op_key val descriptors */
+        .kind         = OP_KEY_KIND_PRESENT,
+        .present.size = val_size,
+        .present.ptr  = (void*)val_data /* safe: ops layer treats as read-only */
+    };
 
     EML_DBG(LOG_TAG, "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
             dbi_idx, (int)type, key_size, val_size);

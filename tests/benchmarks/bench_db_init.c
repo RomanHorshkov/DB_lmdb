@@ -280,37 +280,45 @@ static void calculate_stats(double* samples, size_t n, stats_t* out) {
 }
 
 /**
- * @brief Run a single benchmark iteration
+ * @brief Run a single benchmark iteration for a given DBI layout.
  * @return Time in microseconds for INITIALIZATION ONLY, or -1.0 on error
  */
-static double bench_single_init_only(void) {
-    const char* dbi_names[] = {"test_dbi"};
-    dbi_type_t dbi_types[] = {DBI_TYPE_DEFAULT};
-    
+static double bench_single_init_only(const char* db_path,
+                                     const char* const* dbi_names,
+                                     const dbi_type_t* dbi_types,
+                                     unsigned int n_dbis)
+{
     /* TIMING STARTS: Measure ONLY initialization time */
     double start = get_time_us();
 
     /* Initialize database (folder creation + environment setup) */
-    int rc = db_core_init(BENCH_DB_PATH, BENCH_DB_MODE, dbi_names, dbi_types, 1);
-    
+    int rc = db_core_init(db_path, BENCH_DB_MODE, dbi_names, dbi_types, n_dbis);
+
     /* TIMING ENDS: Stop measurement immediately after init */
     double end = get_time_us();
-    
-    if (rc != 0) {
+
+    if(rc != 0)
+    {
         fprintf(stderr, "ERROR: db_core_init failed with rc=%d\n", rc);
         return -1.0;
     }
-    
+
     /* Shutdown database - NOT TIMED */
     (void)db_core_shutdown();
-    
+
     return end - start;
 }
 
 /**
- * @brief Run benchmark suite
+ * @brief Run benchmark suite for a given DBI layout.
  */
-static int run_benchmark(const char* output_file) {
+static int run_benchmark(const char* label,
+                         const char* db_path,
+                         const char* output_file,
+                         const char* const* dbi_names,
+                         const dbi_type_t* dbi_types,
+                         unsigned int n_dbis)
+{
     sys_info_t sys_info = {0};
     get_system_info(&sys_info);
     
@@ -321,7 +329,7 @@ static int run_benchmark(const char* output_file) {
     }
     
     printf("=================================================================\n");
-    printf("Database Initialization Benchmark (FROM SCRATCH)\n");
+    printf("Database Initialization Benchmark (%s, FROM SCRATCH)\n", label);
     printf("=================================================================\n");
     printf("\n");
     printf("SYSTEM INFORMATION:\n");
@@ -343,7 +351,7 @@ static int run_benchmark(const char* output_file) {
     printf("Iterations:     %d (each starting from clean state)\n", BENCH_ITERATIONS);
     printf("DB Path:        %s\n", BENCH_DB_PATH);
     printf("DB Mode:        0%o\n", BENCH_DB_MODE);
-    printf("Sub-DBIs:       1\n");
+    printf("Sub-DBIs:       %u\n", n_dbis);
     printf("=================================================================\n\n");
     
     printf("Running benchmark...\n");
@@ -351,7 +359,7 @@ static int run_benchmark(const char* output_file) {
     /* Run all iterations */
     for (int iter = 0; iter < BENCH_ITERATIONS; iter++) {
         /* Measure ONLY initialization time (NOT shutdown) */
-        double iter_time = bench_single_init_only();
+        double iter_time = bench_single_init_only(db_path, dbi_names, dbi_types, n_dbis);
         if (iter_time < 0.0) {
             fprintf(stderr, "ERROR: Benchmark iteration %d failed\n", iter);
             free(all_times);
@@ -360,8 +368,9 @@ static int run_benchmark(const char* output_file) {
         all_times[iter] = iter_time;
         
         /* Clean up database directory for next iteration (NOT TIMED) */
-        if (remove_directory(BENCH_DB_PATH) != 0) {
-            fprintf(stderr, "WARNING: Failed to remove directory %s\n", BENCH_DB_PATH);
+        if(remove_directory(db_path) != 0)
+        {
+            fprintf(stderr, "WARNING: Failed to remove directory %s\n", db_path);
         }
         
         /* Progress indicator */
@@ -434,9 +443,9 @@ static int run_benchmark(const char* output_file) {
     fprintf(fp, "What is Measured:  Folder creation + environment setup time\n");
     fprintf(fp, "NOT Measured:      Shutdown/cleanup time (excluded)\n");
     fprintf(fp, "Total Iterations:  %d\n", BENCH_ITERATIONS);
-    fprintf(fp, "DB Path:           %s\n", BENCH_DB_PATH);
+    fprintf(fp, "DB Path:           %s\n", db_path);
     fprintf(fp, "DB Mode:           0%o\n", BENCH_DB_MODE);
-    fprintf(fp, "Sub-DBIs:          1\n");
+    fprintf(fp, "Sub-DBIs:          %u\n", n_dbis);
     fprintf(fp, "Note:              Each iteration starts from a completely clean state\n");
     fprintf(fp, "                   (directory deleted between iterations)\n");
     
@@ -466,13 +475,15 @@ static int run_benchmark(const char* output_file) {
 }
 
 int main(int argc, char* argv[]) {
-    const char* output_file = "tests/benchmarks/results/bench_db_init_results.txt";
+    const char* output_file_1  = "tests/benchmarks/results/bench_db_init_results_1dbi.txt";
+    const char* output_file_10 = "tests/benchmarks/results/bench_db_init_results_10dbis.txt";
 
-    /* Allow custom output file from command line */
-    if (argc > 1) {
-        output_file = argv[1];
+    /* Allow overriding the base output file from command line (1 DBI case). */
+    if(argc > 1)
+    {
+        output_file_1 = argv[1];
     }
-    
+
     /* Ensure results directory exists */
     struct stat st;
     if(stat("tests/benchmarks/results", &st) != 0)
@@ -489,16 +500,58 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    int rc = run_benchmark(output_file);
-    
+    /* Define DBI layouts */
+    static const char* dbi_names_1[]  = { "test_dbi" };
+    static const dbi_type_t dbi_types_1[]  = { DBI_TYPE_DEFAULT };
+
+    static const char* dbi_names_10[] = {
+        "bench_dbi0",
+        "bench_dbi1",
+        "bench_dbi2",
+        "bench_dbi3",
+        "bench_dbi4",
+        "bench_dbi5",
+        "bench_dbi6",
+        "bench_dbi7",
+        "bench_dbi8",
+        "bench_dbi9",
+    };
+    static const dbi_type_t dbi_types_10[] = {
+        DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT,
+        DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT, DBI_TYPE_DEFAULT,
+    };
+
+    int rc = 0;
+
+    /* 1 DBI benchmark */
+    rc = run_benchmark("1 DBI", BENCH_DB_PATH, output_file_1, dbi_names_1, dbi_types_1, 1u);
+    if(rc != 0)
+    {
+        fprintf(stderr, "Benchmark for 1 DBI failed with error code: %d\n", rc);
+    }
+
+    /* Final cleanup between variants */
+    (void)remove_directory(BENCH_DB_PATH);
+
+    /* 10 DBIs benchmark (reuse same DB path, but different DBI layout) */
+    int rc10 = run_benchmark("10 DBIs", BENCH_DB_PATH, output_file_10, dbi_names_10, dbi_types_10, 10u);
+    if(rc10 != 0)
+    {
+        fprintf(stderr, "Benchmark for 10 DBIs failed with error code: %d\n", rc10);
+    }
+
+    /* Final cleanup */
     /* Final cleanup */
     remove_directory(BENCH_DB_PATH);
     
-    if (rc == 0) {
-        printf("Benchmark completed successfully!\n");
+    if(rc == 0 && rc10 == 0)
+    {
+        printf("All benchmarks completed successfully!\n");
         return 0;
-    } else {
-        fprintf(stderr, "Benchmark failed with error code: %d\n", rc);
+    }
+    else
+    {
+        fprintf(stderr, "One or more benchmarks failed (1 DBI rc=%d, 10 DBIs rc=%d)\n", rc, rc10);
         return 1;
     }
 }

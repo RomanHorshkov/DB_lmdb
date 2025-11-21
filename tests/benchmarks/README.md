@@ -9,23 +9,28 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 **Purpose**: Measures the time to initialize a database from scratch (folder creation + environment setup).
 
 **What is measured**:
+
 - ONLY the initialization time (`db_core_init`)
 - Includes directory creation and environment setup
 - Each test iteration starts from a completely clean state
 
 **What is NOT measured**:
+
 - Shutdown/cleanup time (excluded from timing)
 
 **Configuration**:
-- Iterations: 1000 (each from clean state)
+
+- Iterations: 100 (each from clean state)
 - Sub-DBIs: 1
 - Database path: `/tmp/bench_lmdb_test`
 
 **Output**:
+
 - Console: System info + summary statistics
 - File: `results/bench_db_init_results.txt` with complete system information and all iteration timings
 
 **Running**:
+
 ```bash
 # Using the convenience script
 ./utils/run_bench.sh
