@@ -7,16 +7,37 @@ skinparam backgroundColor transparent
 
 package "Core" {
   component "Core" as core
+    note top of core
+    Core:
+    - public facade and orchestration
+    - owns init / add_op / exec_ops / shutdown
+    end note
 
   package "Ops" {
     component "Ops" as ops
+      note right of ops
+      Ops:
+      - env + DBI setup
+      - transaction helpers
+      - batched LMDB operations
+      end note
 
     package "DB" {
       component "DB" as db
+        note right of db
+        DB:
+        - DataBase_t and DBI descriptors
+        - hides raw LMDB handles from callers
+        end note
     }
 
     package "Security" {
       component "Security" as sec
+        note right of sec
+        Security:
+        - LMDB rc → safety policy
+        - central errno mapping and mapsize expansion
+        end note
     }
   }
 }
@@ -24,36 +45,11 @@ package "Core" {
 component "LMDB C API" as lmdb
 component "EMlog" as emlog
 
-core --> ops
-ops --> db
-ops --> sec
+core --> Ops
+ops --> DB
+ops --> Security
 db --> lmdb
 sec --> lmdb
 core --> emlog
-
-note top of core
-Core:
-- public facade and orchestration
-- owns init / add_op / exec_ops / shutdown
-end note
-
-note right of ops
-Ops:
-- env + DBI setup
-- transaction helpers
-- batched LMDB operations
-end note
-
-note right of db
-DB:
-- DataBase_t and DBI descriptors
-- hides raw LMDB handles from callers
-end note
-
-note right of sec
-Security:
-- LMDB rc → safety policy
-- central errno mapping and mapsize expansion
-end note
 
 @enduml
