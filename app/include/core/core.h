@@ -76,8 +76,8 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
  * @param val_size Size of value buffer in bytes (for PUT).
  * @return 0 on success, negative errno-style code on failure.
  */
-int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_t key_size,
-                   const void* val_data, size_t val_size);
+int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key_data,
+                   const size_t key_size, const void* val_data, const size_t val_size);
 
 /**
  * @brief Execute all queued operations as a single batch.

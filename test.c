@@ -13,8 +13,10 @@ int main(void)
 
 
     /* Describe a single default DBI via simple arrays. */
-    const char*      dbi_names[]  = { "demo_dbi" };
-    const dbi_type_t dbi_types[]  = { DBI_TYPE_NOOVERWRITE };
+    const char*      dbi_names[]  = { "user_dbi",
+                                      "device_dbi" };
+    const dbi_type_t dbi_types[]  = { DBI_TYPE_NOOVERWRITE,
+                                      DBI_TYPE_NOOVERWRITE };
 
     int rc = db_core_init(db_path, DB_LMDB_ENV_MODE, dbi_names, dbi_types, 1);
     if(rc != 0)
@@ -26,19 +28,28 @@ int main(void)
     emlog_init(EML_LEVEL_DBG, true);
 
     rc = db_core_add_op(0, DB_OPERATION_PUT,
-                         (const void*)"sample_gay", sizeof("sample_gay"),
-                         (const void*)"sample_values", sizeof("sample_values"));
+                         (const void*)"user_1", sizeof("user_1"),
+                         (const void*)"user1val", sizeof("user1val"));
 
     rc = db_core_exec_ops();
 
     printf("db_core_exec_put returned: %d\n", rc);
 
+    char val_buf[64] = {0}; /* buffer for get value */
+
     rc = db_core_add_op(0, DB_OPERATION_GET,
-                         (const void*)"sample_gay", sizeof("sample_gay"),
-                         NULL, 0);
+                         (const void*)"user_1", sizeof("user_1"),
+                         val_buf, 64);
 
     rc = db_core_exec_ops();
-    printf("db_core_exec_get returned: %d\n", rc);
+    if(rc == 0)
+    {
+        printf("GET operation successful, value: %s\n", val_buf);
+    }
+    else
+    {
+        printf("GET operation failed with code: %d\n", rc);
+    }
 
     /* For now just init + shutdown; ops wiring will come next. */
     size_t final_mapsize = db_core_shutdown();

@@ -24,6 +24,8 @@ extern "C"
 ****************************************************************************
 */
 
+op_t* ops_get_next_op(void);
+
 int ops_add_operation(const op_t* operation);
 
 int ops_execute_operations(void);

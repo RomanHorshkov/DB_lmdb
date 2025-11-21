@@ -82,6 +82,19 @@ static inline unsigned int _txn_type_from_batch_type(void)
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
+
+op_t* ops_get_next_op(void)
+{
+    if(ops_cache.n_ops >= OPS_CACHE_SIZE)
+    {
+        EML_ERROR(LOG_TAG, "ops_get_next_op: ops cache full, exceeded %d ops", OPS_CACHE_SIZE);
+        return NULL;
+    }
+
+    /* Return pointer to next op */
+    return &ops_cache.ops[ops_cache.n_ops];
+}
+
 int ops_add_operation(const op_t* operation)
 {
     /* Input check */
@@ -113,16 +126,17 @@ int ops_add_operation(const op_t* operation)
                   operation->key.lookup.op_index, ops_cache.n_ops);
         return -EINVAL;
     }
-
-    /* Add operation to cache */
-    if(ops_cache.n_ops >= OPS_CACHE_SIZE)
+    /* Same for val */
+    if(operation->val.kind == OP_KEY_KIND_LOOKUP &&
+       operation->val.lookup.op_index > ops_cache.n_ops)
     {
-        EML_ERROR(LOG_TAG, "_add_op: ops cache full, exceeded %d ops", OPS_CACHE_SIZE);
-        return -ENOMEM;
+        EML_ERROR(LOG_TAG, "_add_op: invalid val lookup index %u (n_ops=%zu)",
+                  operation->val.lookup.op_index, ops_cache.n_ops);
+        return -EINVAL;
     }
 
-    /* shallow struct copy */
-    ops_cache.ops[ops_cache.n_ops++] = *operation;
+    /* Add operation to cache, the struct is already setted up */
+    ops_cache.n_ops++;
 
     EML_DBG(LOG_TAG, "_add_op: queued op #%zu (dbi=%u type=%d key_kind=%d val_kind=%d)",
             ops_cache.n_ops - 1, operation->dbi, (int)operation->type, operation->key.kind,

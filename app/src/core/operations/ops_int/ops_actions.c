@@ -170,8 +170,9 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
     }
 
     /* Get immediately the result, then decide what to do with it. */
+    dbi_t*  dbi = &DataBase->dbis[op->dbi];
     MDB_val tmp_val;
-    int     mdb_res = mdb_get(txn, op->dbi, k_ptr, &tmp_val);
+    int     mdb_res = mdb_get(txn, dbi->dbi, k_ptr, &tmp_val);
     if(mdb_res != 0) goto fail;
 
     /* use op->val.present which is layout-compatible with MDB_val.

@@ -493,10 +493,10 @@ static int _ensure_env_dir(const char* path)
 
         if((st.st_mode & (S_IRWXG | S_IRWXO)) != 0)
         {
-            EML_ERROR(LOG_TAG,
-                      "_ensure_env_dir: %s has too-permissive mode (%o); group/other bits must be 0",
-                      path,
-                      st.st_mode);
+            EML_ERROR(
+                LOG_TAG,
+                "_ensure_env_dir: %s has too-permissive mode (%o); group/other bits must be 0",
+                path, st.st_mode);
             return -EACCES;
         }
 
@@ -514,9 +514,7 @@ static int _ensure_env_dir(const char* path)
     if(mkdir(path, dir_mode) != 0)
     {
         int saved = errno;
-        EML_ERROR(LOG_TAG, "_ensure_env_dir: mkdir(%s, %o) failed, errno=%d",
-                  path,
-                  dir_mode,
+        EML_ERROR(LOG_TAG, "_ensure_env_dir: mkdir(%s, %o) failed, errno=%d", path, dir_mode,
                   saved);
         return -saved;
     }

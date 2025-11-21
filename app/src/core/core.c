@@ -2,18 +2,18 @@
  * @file db_lmdb_core.c
  */
 
-#include <errno.h>       /* EINVAL, ENOMEM, EALREADY */
-#include <stdint.h>      /* uint8_t */
-#include <stdlib.h>      /* calloc, free */
+#include <errno.h>         /* EINVAL, ENOMEM, EALREADY */
+#include <stdint.h>        /* uint8_t */
+#include <stdlib.h>        /* calloc, free */
 
-#include "common.h"      /* EML_* macros, LMDB_EML_* */
+#include "common.h"        /* EML_* macros, LMDB_EML_* */
 #include "core.h"
-#include "db.h"          /* DataBase_t, MDB_envinfo */
-#include "dbi_int.h"     /* dbi_t */
-#include "ops_actions.h" /* act_txn_begin, act_txn_commit */
-#include "ops_exec.h"    /* ops_add_operation, ops_execute_operations */
-#include "ops_facade.h"  /* DB_OPERATION_* */
-#include "ops_init.h"    /* ops_init_env, ops_init_dbi */
+#include "db.h"            /* DataBase_t, MDB_envinfo */
+#include "dbi_int.h"       /* dbi_t */
+#include "ops_actions.h"   /* act_txn_begin, act_txn_commit */
+#include "ops_exec.h"      /* ops_add_operation, ops_execute_operations */
+#include "ops_facade.h"    /* DB_OPERATION_* */
+#include "ops_init.h"      /* ops_init_env, ops_init_dbi */
 #include "ops_internals.h" /* op_t, op_key_t, op_type_t */
 
 /* Definition of the global DB handle declared in db.h */
@@ -40,17 +40,125 @@ DataBase_t* DataBase = NULL;
  */
 /* None */
 
+static int _prepare_op_key_and_val(op_t* op, const op_type_t type, const void* key_data,
+                                   const size_t key_size, const void* val_data,
+                                   const size_t val_size)
+{
+    /* In any case key_size has to be != 0 */
+    if(key_size == 0)
+    {
+        EML_ERROR(LOG_TAG, "_prepare_op_key_and_val: invalid key size=0");
+        return -EINVAL;
+    }
+
+    /* switch the operation type */
+    switch(type)
+    {
+        case DB_OPERATION_PUT:
+            /* Put operation needs as well a clear val */
+            if(val_size == 0)
+            {
+                EML_ERROR(LOG_TAG, "_prepare_op_key_and_val: invalid val for PUT (size=0)");
+                return -EINVAL;
+            }
+
+            /* put value have been given by user */
+            if(val_data)
+            {
+                op->val.kind         = OP_KEY_KIND_PRESENT;
+                op->val.present.ptr  = (void*)val_data;
+                op->val.present.size = val_size;
+            }
+            else
+            {
+                op->val.kind            = OP_KEY_KIND_LOOKUP;
+                op->val.lookup.op_index = val_size;
+                /* TODO:
+            HARDCODED PATH. PUT ALLOWS LOOKING JUST 
+            FOR PREVIOUS -VAL- RESULT */
+                op->val.lookup.src_type = OP_KEY_SRC_VAL;
+            }
+
+            /* Set the key */
+            if(key_data)
+            {
+                op->key.kind         = OP_KEY_KIND_PRESENT;
+                op->key.present.ptr  = (void*)key_data;
+                op->key.present.size = key_size;
+            }
+            else
+            {
+                op->key.kind            = OP_KEY_KIND_LOOKUP;
+                op->key.lookup.op_index = key_size;
+                op->key.lookup.src_type = OP_KEY_SRC_KEY;
+            }
+
+            break;
+
+        case DB_OPERATION_GET:
+            /* Key resolution */
+            /* Key is given by the user */
+            if(key_data)
+            {
+                op->key.kind         = OP_KEY_KIND_PRESENT;
+                op->key.present.ptr  = (void*)key_data;
+                op->key.present.size = key_size;
+            }
+            /* Key is not given, has to be looked up */
+            else
+            {
+                op->key.kind            = OP_KEY_KIND_LOOKUP;
+                op->key.lookup.op_index = key_size;
+                op->key.lookup.src_type = OP_KEY_SRC_KEY;
+            }
+
+            /* Value handling:
+             * - When val_data is provided, treat it as a user buffer that
+             *   act_get() should copy into (PRESENT).
+             * - When val_data is NULL, this means "no user buffer"; act_get()
+             *   will populate op->val with an LMDB-backed view (PRESENT) on
+             *   success. */
+            if(val_data)
+            {
+                if(val_size == 0)
+                {
+                    EML_ERROR(LOG_TAG,
+                              "_prepare_op_key_and_val: invalid val_size=0 for GET with val_data");
+                    return -EINVAL;
+                }
+                /* User provided buffer for GET result. */
+                op->val.kind         = OP_KEY_KIND_PRESENT;
+                op->val.present.size = val_size;
+                op->val.present.ptr  = (void*)val_data;
+            }
+            else
+            {
+                /* No user buffer: let act_get() populate op->val with a
+                 * PRESENT descriptor that points into LMDB-managed memory. */
+                op->val.kind = OP_KEY_KIND_NONE;
+            }
+
+            break;
+
+        default:
+            EML_ERROR(LOG_TAG, "db_core_add_op: unsupported operation type=%d", type);
+            return -EINVAL;
+            break;
+    }
+
+    /* Set the operation type */
+    op->type = type;
+    return 0;
+}
+
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
  */
 
-int db_core_init(const char* const path, const unsigned int mode,
-                 const char* const* dbi_names, const dbi_type_t* dbi_types,
-                 unsigned n_dbis)
+int db_core_init(const char* const path, const unsigned int mode, const char* const* dbi_names,
+                 const dbi_type_t* dbi_types, unsigned n_dbis)
 {
-    /* Set default logger */
-    emlog_init(EML_LEVEL_WARN, true);
     if(DataBase)
     {
         EML_ERROR(LOG_TAG, "_db_init: database already initialized");
@@ -160,8 +268,8 @@ fail:
     return out_err_val;
 }
 
-int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_t key_size,
-                   const void* val_data, size_t val_size)
+int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key_data,
+                   const size_t key_size, const void* val_data, const size_t val_size)
 {
     /* Validate global DB and DBI index */
     if(!DataBase || !DataBase->dbis || dbi_idx >= DataBase->n_dbis)
@@ -171,46 +279,29 @@ int db_core_add_op(unsigned dbi_idx, op_type_t type, const void* key_data, size_
         return -EINVAL;
     }
 
-    /* Validate operation type: for now only PUT/GET are supported. */
-    if(type != DB_OPERATION_PUT && type != DB_OPERATION_GET)
+    /* Get nex op */
+    op_t* op = ops_get_next_op();
+    if(!op)
     {
-        EML_ERROR(LOG_TAG, "db_core_add_op: unsupported op type=%d", type);
-        return -EINVAL;
+        EML_ERROR(LOG_TAG, "db_core_add_op: ops_get_next_op failed");
+        return -ENOMEM;
     }
 
-    /* Validate key buffer */
-    if(!key_data || key_size == 0)
+    int res = _prepare_op_key_and_val(op, type, key_data, key_size, val_data, val_size);
+    if(res != 0)
     {
-        EML_ERROR(LOG_TAG, "db_core_add_op: invalid key buffer");
-        return -EINVAL;
-    }
-
-    /* Validate value buffer */
-    if(type == DB_OPERATION_PUT && (!val_data || val_size == 0))
-    {
-        EML_ERROR(LOG_TAG, "db_core_add_op: invalid value buffer for PUT");
-        return -EINVAL;
+        EML_ERROR(LOG_TAG, "db_core_add_op: _prepare_op_key_and_val failed");
+        return res;
     }
 
     /* Assemble operation, shallow copied into ops cache */
-    op_t op;
-    op.dbi  = dbi_idx;
-    op.type = type;
-    op.key  = (op_key_t){ /* Build op_key_t key descriptors */
-        .kind         = OP_KEY_KIND_PRESENT,
-        .present.size = key_size,
-        .present.ptr  = (void*)key_data /* safe: ops layer treats as read-only */
-    };
-    op.val = (op_key_t){ /* Build op_key val descriptors */
-        .kind         = OP_KEY_KIND_PRESENT,
-        .present.size = val_size,
-        .present.ptr  = (void*)val_data /* safe: ops layer treats as read-only */
-    };
+    op->dbi  = dbi_idx;
+    op->type = type;
 
     EML_DBG(LOG_TAG, "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
             dbi_idx, (int)type, key_size, val_size);
 
-    return ops_add_operation(&op);
+    return ops_add_operation(op);
 }
 
 int db_core_exec_ops(void)
