@@ -205,7 +205,6 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
     switch(ops_init_env(DB_MAX_DBIS, path, mode, out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_INFO(LOG_TAG, "_init_db: environment initialized (max_dbis=%u)", DB_MAX_DBIS);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _init_env failed, err=%d", out_err_val);
@@ -218,7 +217,6 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
     switch(act_txn_begin(&txn, 0, out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_DBG(LOG_TAG, "_init_db: init transaction begun");
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_db: _txn_begin failed, err=%d", out_err_val);
@@ -241,7 +239,6 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
         switch(ops_init_dbi(txn, name, i, type, out_err))
         {
             case DB_SAFETY_SUCCESS:
-                EML_INFO(LOG_TAG, "_init_db: DBI[%u] \"%s\" initialized (type=%d)", i, name, type);
                 break;
             default:
                 EML_ERROR(LOG_TAG, "_init_db: _init_dbi failed for dbi %s, err=%d", name,
@@ -255,11 +252,11 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
         case DB_SAFETY_SUCCESS:
             break;
         default:
-            EML_PERR(LOG_TAG, "_init_db: _txn_commit failed err=%d", *out_err);
+            EML_ERROR(LOG_TAG, "_init_db: _txn_commit failed err=%d", *out_err);
             goto fail;
     }
 
-    EML_INFO(LOG_TAG, "_init_db: database initialized with %u dbis at %s", n_dbis, path);
+    EML_INFO(LOG_TAG, "_init_db: database initialized with %u dbis, with size %llu", n_dbis, DB_MAP_SIZE_MAX);
     return 0;
 
 fail:

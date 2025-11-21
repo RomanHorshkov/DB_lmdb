@@ -11,7 +11,7 @@
  ****************************************************************************
  */
 
-#define LOG_TAG "ops_init"
+#define LOG_TAG "db_ops_init"
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -236,16 +236,12 @@ static int _ensure_env_dir(const char* path);
 db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* const path,
                                     const unsigned int mode, int* const out_err)
 {
-    EML_INFO(LOG_TAG, "ops_init_env: creating LMDB env (path=%s, mode=%o, max_dbis=%u)",
-             path ? path : "(null)", mode, max_dbis);
-
     /* Do NOT allow retry at initialization */
 
     /* Create environment */
     switch(_db_create_env(out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_DBG(LOG_TAG, "ops_init_env: environment handle created");
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _create_env failed");
@@ -256,7 +252,6 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_set_max_dbis(max_dbis, out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_DBG(LOG_TAG, "ops_init_env: max DBIs set to %u", max_dbis);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_max_dbis failed");
@@ -267,7 +262,6 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_set_map_size(out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_DBG(LOG_TAG, "ops_init_env: initial map size set to %zu", (size_t)DB_MAP_SIZE_INIT);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _set_map_size failed");
@@ -278,13 +272,13 @@ db_security_ret_code_t ops_init_env(const unsigned int max_dbis, const char* con
     switch(_db_open_env(path, mode, out_err))
     {
         case DB_SAFETY_SUCCESS:
-            EML_INFO(LOG_TAG, "ops_init_env: environment opened at %s", path);
             break;
         default:
             EML_ERROR(LOG_TAG, "_init_env: _open_env failed");
             return DB_SAFETY_FAIL;
     }
 
+    EML_INFO(LOG_TAG, "_init_env: DataBase environment opened");
     return DB_SAFETY_SUCCESS;
 }
 
