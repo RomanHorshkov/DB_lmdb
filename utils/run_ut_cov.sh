@@ -28,6 +28,7 @@ cmake --build "${BUILD_DIR}" -j"$(nproc)"
 
 UT_BINS=(
     "${BUILD_DIR}/db_core_ut_security"
+    "${BUILD_DIR}/db_core_ut_ops_actions"
     "${BUILD_DIR}/db_core_ut_dbi_int"
     "${BUILD_DIR}/db_core_ut_ops_init"
 )

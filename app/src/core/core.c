@@ -49,6 +49,8 @@ int db_core_init(const char* const path, const unsigned int mode,
                  const char* const* dbi_names, const dbi_type_t* dbi_types,
                  unsigned n_dbis)
 {
+    /* Set default logger */
+    emlog_init(EML_LEVEL_WARN, true);
     if(DataBase)
     {
         EML_ERROR(LOG_TAG, "_db_init: database already initialized");

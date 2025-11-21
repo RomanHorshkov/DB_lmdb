@@ -46,6 +46,10 @@ typedef int  (*ut_mdb_env_set_maxdbs_fn)(MDB_env* env, MDB_dbi dbs);
 typedef int  (*ut_mdb_env_open_fn)(MDB_env* env, const char* path, unsigned int flags, mdb_mode_t mode);
 typedef int  (*ut_mdb_dbi_open_fn)(MDB_txn* txn, const char* name, unsigned int flags, MDB_dbi* dbi);
 typedef int  (*ut_mdb_dbi_flags_fn)(MDB_txn* txn, MDB_dbi dbi, unsigned int* flags);
+typedef int  (*ut_mdb_txn_begin_fn)(MDB_env* env, MDB_txn* parent, unsigned int flags, MDB_txn** out);
+typedef int  (*ut_mdb_txn_commit_fn)(MDB_txn* txn);
+typedef int  (*ut_mdb_put_fn)(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data, unsigned int flags);
+typedef int  (*ut_mdb_get_fn)(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data);
 
 extern ut_mdb_env_info_fn         g_ut_mdb_env_info;
 extern ut_mdb_env_set_mapsize_fn  g_ut_mdb_env_set_mapsize;
@@ -56,6 +60,10 @@ extern ut_mdb_env_set_maxdbs_fn   g_ut_mdb_env_set_maxdbs;
 extern ut_mdb_env_open_fn         g_ut_mdb_env_open;
 extern ut_mdb_dbi_open_fn         g_ut_mdb_dbi_open;
 extern ut_mdb_dbi_flags_fn        g_ut_mdb_dbi_flags;
+extern ut_mdb_txn_begin_fn        g_ut_mdb_txn_begin;
+extern ut_mdb_txn_commit_fn       g_ut_mdb_txn_commit;
+extern ut_mdb_put_fn              g_ut_mdb_put;
+extern ut_mdb_get_fn              g_ut_mdb_get;
 
 /* Reset all LMDB stub hooks back to their defaults. */
 void ut_reset_lmdb_stubs(void);

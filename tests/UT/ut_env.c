@@ -15,6 +15,10 @@ ut_mdb_env_set_maxdbs_fn   g_ut_mdb_env_set_maxdbs   = NULL;
 ut_mdb_env_open_fn         g_ut_mdb_env_open         = NULL;
 ut_mdb_dbi_open_fn         g_ut_mdb_dbi_open         = NULL;
 ut_mdb_dbi_flags_fn        g_ut_mdb_dbi_flags        = NULL;
+ut_mdb_txn_begin_fn        g_ut_mdb_txn_begin        = NULL;
+ut_mdb_txn_commit_fn       g_ut_mdb_txn_commit       = NULL;
+ut_mdb_put_fn              g_ut_mdb_put              = NULL;
+ut_mdb_get_fn              g_ut_mdb_get              = NULL;
 
 void ut_reset_lmdb_stubs(void)
 {
@@ -27,6 +31,10 @@ void ut_reset_lmdb_stubs(void)
     g_ut_mdb_env_open         = NULL;
     g_ut_mdb_dbi_open         = NULL;
     g_ut_mdb_dbi_flags        = NULL;
+    g_ut_mdb_txn_begin        = NULL;
+    g_ut_mdb_txn_commit       = NULL;
+    g_ut_mdb_put              = NULL;
+    g_ut_mdb_get              = NULL;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -179,6 +187,67 @@ int mdb_dbi_flags(MDB_txn* txn, MDB_dbi dbi, unsigned int* flags)
     if(flags)
     {
         *flags = 0u;
+    }
+    return MDB_SUCCESS;
+}
+
+int mdb_txn_begin(MDB_env* env, MDB_txn* parent, unsigned int flags, MDB_txn** out)
+{
+    if(g_ut_mdb_txn_begin)
+    {
+        return g_ut_mdb_txn_begin(env, parent, flags, out);
+    }
+
+    (void)parent;
+    (void)flags;
+    if(out)
+    {
+        *out = (MDB_txn*)0x100;
+    }
+    (void)env;
+    return MDB_SUCCESS;
+}
+
+int mdb_txn_commit(MDB_txn* txn)
+{
+    if(g_ut_mdb_txn_commit)
+    {
+        return g_ut_mdb_txn_commit(txn);
+    }
+
+    (void)txn;
+    return MDB_SUCCESS;
+}
+
+int mdb_put(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data, unsigned int flags)
+{
+    if(g_ut_mdb_put)
+    {
+        return g_ut_mdb_put(txn, dbi, key, data, flags);
+    }
+
+    (void)txn;
+    (void)dbi;
+    (void)key;
+    (void)data;
+    (void)flags;
+    return MDB_SUCCESS;
+}
+
+int mdb_get(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* data)
+{
+    if(g_ut_mdb_get)
+    {
+        return g_ut_mdb_get(txn, dbi, key, data);
+    }
+
+    (void)txn;
+    (void)dbi;
+    (void)key;
+    if(data)
+    {
+        data->mv_data = NULL;
+        data->mv_size = 0;
     }
     return MDB_SUCCESS;
 }

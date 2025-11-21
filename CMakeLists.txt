@@ -133,6 +133,31 @@ target_link_libraries(db_core_ut_security
         cmocka_db_core::cmocka
 )
 
+add_executable(db_core_ut_ops_actions
+    tests/UT/UT_ops_actions.c
+    tests/UT/ut_env.c
+    app/src/core/operations/ops_int/ops_actions.c
+    app/src/core/operations/ops_int/security/security.c
+    app/src/core/operations/ops_int/db/dbi_int.c
+)
+
+target_include_directories(db_core_ut_ops_actions
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/db
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/include/core/operations/ops_int/security
+        ${CMAKE_CURRENT_SOURCE_DIR}/app/external/EMlog/app/include
+)
+
+target_link_libraries(db_core_ut_ops_actions
+    PRIVATE
+        cmocka_db_core::cmocka
+)
+
 add_executable(db_core_ut_dbi_int
     tests/UT/UT_dbi_int.c
     tests/UT/ut_env.c
@@ -184,6 +209,8 @@ if(DB_LMDB_ENABLE_UT_COVERAGE)
     if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(db_core_ut_security PRIVATE --coverage -O2 -g)
         target_link_options(db_core_ut_security PRIVATE --coverage)
+        target_compile_options(db_core_ut_ops_actions PRIVATE --coverage -O2 -g)
+        target_link_options(db_core_ut_ops_actions PRIVATE --coverage)
         target_compile_options(db_core_ut_dbi_int PRIVATE --coverage -O2 -g)
         target_link_options(db_core_ut_dbi_int PRIVATE --coverage)
         target_compile_options(db_core_ut_ops_init PRIVATE --coverage -O2 -g)
