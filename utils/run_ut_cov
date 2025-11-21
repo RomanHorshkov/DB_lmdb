@@ -24,22 +24,29 @@ echo "${BLUE}[UT] cleaning previous coverage data...${RESET}"
 find "${BUILD_DIR}" -name '*.gcda' -delete 2>/dev/null || true
 
 echo "${BLUE}[UT] building unit tests...${RESET}"
-cmake --build "${BUILD_DIR}" --target db_core_ut_security_errno_map -j"$(nproc)"
+cmake --build "${BUILD_DIR}" -j"$(nproc)"
 
-UT_BIN="${BUILD_DIR}/db_core_ut_security_errno_map"
-if [[ ! -x "${UT_BIN}" ]]; then
-    echo "${RED}[UT] Unit test binary not found: ${UT_BIN}${RESET}" >&2
-    exit 1
-fi
+UT_BINS=(
+    "${BUILD_DIR}/db_core_ut_security"
+    "${BUILD_DIR}/db_core_ut_dbi_int"
+)
 
 echo "${BLUE}[UT] running unit tests (with coverage)...${RESET}"
-if "${UT_BIN}"; then
-    echo "${GREEN}[UT] Unit tests PASSED.${RESET}"
-else
-    status=$?
-    echo "${RED}[UT] Unit tests FAILED (rc=${status}).${RESET}"
-    exit "${status}"
-fi
+for bin in "${UT_BINS[@]}"; do
+    if [[ ! -x "${bin}" ]]; then
+        echo "${RED}[UT] Unit test binary not found: ${bin}${RESET}" >&2
+        exit 1
+    fi
+
+    echo "${BLUE}[UT] running $(basename "${bin}")...${RESET}"
+    if ! "${bin}"; then
+        status=$?
+        echo "${RED}[UT] Unit tests FAILED in $(basename "${bin}") (rc=${status}).${RESET}" >&2
+        exit "${status}"
+    fi
+done
+
+echo "${GREEN}[UT] All unit test binaries PASSED.${RESET}"
 
 mkdir -p "${RESULT_DIR}"
 
