@@ -44,6 +44,9 @@ fi
 mkdir -p "${RESULT_DIR}"
 
 if command -v gcovr >/dev/null 2>&1; then
+    echo "${BLUE}[UT] cleaning previous coverage results...${RESET}"
+    rm -f "${RESULT_DIR}"/* 2>/dev/null || true
+
     echo "${BLUE}[UT] generating coverage report...${RESET}"
     gcovr -r "${ROOT_DIR}" \
           --object-directory "${BUILD_DIR}" \

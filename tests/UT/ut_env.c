@@ -5,6 +5,18 @@
 /* Global DB handle expected by core code. */
 DataBase_t* DataBase = NULL;
 
+/* Hook points used by tests to customize LMDB behavior. */
+ut_mdb_env_info_fn        g_ut_mdb_env_info        = NULL;
+ut_mdb_env_set_mapsize_fn g_ut_mdb_env_set_mapsize = NULL;
+ut_mdb_txn_abort_fn       g_ut_mdb_txn_abort       = NULL;
+
+void ut_reset_lmdb_stubs(void)
+{
+    g_ut_mdb_env_info        = NULL;
+    g_ut_mdb_env_set_mapsize = NULL;
+    g_ut_mdb_txn_abort       = NULL;
+}
+
 /* ------------------------------------------------------------------------- */
 /* EMlog stubs                                                               */
 /* ------------------------------------------------------------------------- */
@@ -36,11 +48,22 @@ char* mdb_strerror(int err)
 
 void mdb_txn_abort(MDB_txn* txn)
 {
+    if(g_ut_mdb_txn_abort)
+    {
+        g_ut_mdb_txn_abort(txn);
+        return;
+    }
+
     (void)txn;
 }
 
 int mdb_env_info(MDB_env* env, MDB_envinfo* stat)
 {
+    if(g_ut_mdb_env_info)
+    {
+        return g_ut_mdb_env_info(env, stat);
+    }
+
     (void)env;
     if(stat != NULL)
     {
@@ -53,8 +76,12 @@ int mdb_env_info(MDB_env* env, MDB_envinfo* stat)
 
 int mdb_env_set_mapsize(MDB_env* env, size_t size)
 {
+    if(g_ut_mdb_env_set_mapsize)
+    {
+        return g_ut_mdb_env_set_mapsize(env, size);
+    }
+
     (void)env;
     (void)size;
     return MDB_SUCCESS;
 }
-

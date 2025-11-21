@@ -6,3 +6,4 @@ demo_db/
 docs/plantuml/generated/
 docs/plantuml/puml/*.png
 docs/plantuml/puml/*.svg
+build*
