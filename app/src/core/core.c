@@ -256,7 +256,10 @@ int db_core_init(const char* const path, const unsigned int mode, const char* co
             goto fail;
     }
 
-    EML_INFO(LOG_TAG, "_init_db: database initialized with %u dbis, with size %llu", n_dbis, DB_MAP_SIZE_MAX);
+    EML_INFO(
+        LOG_TAG,
+        "_init_db: database initialized with %u dbis, with initial size %llu and max size %llu",
+        n_dbis, DB_MAP_SIZE_INIT, DB_MAP_SIZE_MAX);
     return 0;
 
 fail:
@@ -294,9 +297,6 @@ int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key
     /* Assemble operation, shallow copied into ops cache */
     op->dbi  = dbi_idx;
     op->type = type;
-
-    EML_DBG(LOG_TAG, "db_core_add_op: queued op (dbi=%u type=%d key_size=%zu val_size=%zu)",
-            dbi_idx, (int)type, key_size, val_size);
 
     return ops_add_operation(op);
 }

@@ -14,7 +14,7 @@
  ****************************************************************************
  */
 
-#define LOG_TAG        "ops_exec"
+#define LOG_TAG        "db_ops_exec"
 #define OPS_CACHE_SIZE 8
 
 /****************************************************************************
@@ -307,8 +307,6 @@ static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err)
         switch(_exec_op(txn, &ops_cache.ops[i], out_err))
         {
             case DB_SAFETY_SUCCESS:
-                /* Here, in this case, if the op_batch is RW, I should
-                take the "get" result and copy it inside the buff */
                 break;
             case DB_SAFETY_RETRY:
                 EML_WARN(LOG_TAG, "_exec_op: retry at %u", i);

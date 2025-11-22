@@ -45,12 +45,14 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 ./build/bench_db_init /path/to/custom/output.txt
 ```
 
-### bench_db_ops_batch - PUT Operations Benchmark (single vs batched)
+### bench_db_write - PUT Operations Benchmark (single vs batched, append vs normal)
 
-**Purpose**: Compares inserting 1000 user records into a single sub-DBI:
+**Purpose**: Compares inserting user records into a single sub-DBI with and without the append fast-path:
 
 - Non-batched: one `PUT` per `db_core_exec_ops` call
 - Batched: groups of 8 `PUT`s per `db_core_exec_ops`
+- Each mode is measured twice: normal write and appendable write (strictly increasing keys)
+- Normal writes feed keys in descending order to force worst-case page movement; appendable writes use ascending keys to match LMDB's append fast-path.
 
 **What is measured**:
 
@@ -60,21 +62,23 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 
 **Configuration**:
 
-- Users per run: 1000
-- Value size: 1024 bytes
+- Users per run: 100
+- Value size: 512 bytes
 - Batch sizes:
   - 1 (non-batched)
   - 8 (batched)
 - Runs per pattern: 10
 - Sub-DBIs: 1
-- Database path: `/tmp/bench_lmdb_ops`
+- Database path: `/tmp/bench_lmdb_write`
 
 **Output**:
 
 - Console: System info + summary statistics for each pattern
 - Files:
-  - `results/bench_put_users_single.txt`
-  - `results/bench_put_users_batch8.txt`
+  - `results/bench_write_single.txt`
+  - `results/bench_write_single_append.txt`
+  - `results/bench_write_batch8.txt`
+  - `results/bench_write_batch8_append.txt`
   Each contains system information, per-run totals and per-operation statistics.
 
 **Running**:
@@ -84,7 +88,7 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 ./utils/bench/write_db.sh
 
 # Or directly
-./build/bench_db_ops_batch
+./build/bench_db_write
 ```
 
 ### bench_db_get_batch - GET Operations Benchmark (single vs batched)

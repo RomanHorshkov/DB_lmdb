@@ -26,10 +26,14 @@ extern "C"
  */
 typedef enum
 {
-    DBI_TYPE_DEFAULT     = 0,      /* no special flags */
-    DBI_TYPE_NOOVERWRITE = 1 << 0, /* disallow overwrites */
-    DBI_TYPE_DUPSORT     = 1 << 1, /* sorted duplicate keys */
-    DBI_TYPE_DUPFIXED    = 1 << 2  /* fixed-size duplicate keys */
+    DBI_TYPE_DEFAULT     = 0,      /**< default DBI */
+    DBI_TYPE_NOOVERWRITE = 1 << 0, /**< disallow overwriting of existing keys */
+    DBI_TYPE_APPENDABLE  = 1 << 1, /**< append-only DBI (new keys only, no updates) */
+    DBI_TYPE_DUPSORT     = 1 << 5, /**< duplicate keys allowed, sorted */
+    DBI_TYPE_DUPFIXED    = 1 << 6, /**< duplicate keys allowed, fixed-size values */
+
+    // TO IMPLEMENT LATER:
+    // DBI_TYPE_INTEGERKEY  = 1 << 2, /**< keys are binary integers in native byte order */
 } dbi_type_t;
 
 /****************************************************************************

@@ -1,19 +1,15 @@
 /**
- * @file bench_db_ops_batch.c
- * @brief Benchmark for batched vs non-batched PUT operations.
+ * @file bench_db_write.c
+ * @brief Benchmark write paths (single vs batched) with/without append fast-path.
  *
- * This benchmark measures ONLY the time required to insert a fixed number
- * of key/value pairs into a single sub-DBI:
+ * Measures ONLY db_core_add_op + db_core_exec_ops time for four scenarios:
+ *   - Single PUTs, normal
+ *   - Single PUTs, appendable
+ *   - Batched PUTs, normal
+ *   - Batched PUTs, appendable
  *
- *   - Scenario 1: non-batched PUTs (one op per exec)
- *   - Scenario 2: batched PUTs (8 ops per exec)
- *
- * The database environment and DBI are created BEFORE timing starts.
- * Timing starts immediately before the first db_core_add_op/db_core_exec_ops
- * and stops immediately after the last exec completes.
- *
- * Each run starts from a completely clean database directory so that the
- * measured time reflects only the insertion workload, not prior state.
+ * Environment/DBI setup and shutdown are excluded from timing. Each run
+ * starts from a clean directory.
  */
 
 #include "core.h"
@@ -25,6 +21,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
@@ -34,10 +31,10 @@
 #include <unistd.h>
 
 /* Benchmark configuration */
-#define BENCH_DB_PATH        "/tmp/bench_lmdb_ops"
+#define BENCH_DB_PATH        "/tmp/bench_lmdb_write"
 #define BENCH_DB_MODE        0700
-#define BENCH_NUM_USERS      1000
-#define BENCH_VALUE_SIZE     1024
+#define BENCH_NUM_USERS      100
+#define BENCH_VALUE_SIZE     512
 #define BENCH_RUNS           10
 #define BENCH_BATCH_SIZE     8
 
@@ -334,10 +331,11 @@ static void init_test_data(void)
  *   - measures ONLY the time spent in db_core_add_op/db_core_exec_ops
  *   - shuts down the database (not timed)
  */
-static int run_single_put_run(int batch_size, double* out_total_us)
+static int run_single_put_run(const char* dbi_name, dbi_type_t dbi_type, int batch_size,
+                              bool reverse_keys, double* out_total_us)
 {
-    static const char*      dbi_names[] = { "bench_users" };
-    static const dbi_type_t dbi_types[] = { DBI_TYPE_DEFAULT };
+    const char*      dbi_names[] = { dbi_name };
+    const dbi_type_t dbi_types[] = { dbi_type };
 
     /* Clean up any previous database state (not timed). */
     if(remove_directory(BENCH_DB_PATH) != 0)
@@ -360,8 +358,9 @@ static int run_single_put_run(int batch_size, double* out_total_us)
         /* Non-batched: one PUT per exec. */
         for(int i = 0; i < BENCH_NUM_USERS; ++i)
         {
-            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[i],
-                                strlen(g_keys[i]), (const void*)g_value, BENCH_VALUE_SIZE);
+            int key_idx = reverse_keys ? (BENCH_NUM_USERS - 1 - i) : i;
+            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[key_idx],
+                                strlen(g_keys[key_idx]), (const void*)g_value, BENCH_VALUE_SIZE);
             if(rc != 0)
             {
                 fprintf(stderr, "ERROR: db_core_add_op failed (user=%d, rc=%d)\n", i, rc);
@@ -385,8 +384,9 @@ static int run_single_put_run(int batch_size, double* out_total_us)
 
         for(int i = 0; i < BENCH_NUM_USERS; ++i)
         {
-            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[i],
-                                strlen(g_keys[i]), (const void*)g_value, BENCH_VALUE_SIZE);
+            int key_idx = reverse_keys ? (BENCH_NUM_USERS - 1 - i) : i;
+            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[key_idx],
+                                strlen(g_keys[key_idx]), (const void*)g_value, BENCH_VALUE_SIZE);
             if(rc != 0)
             {
                 fprintf(stderr, "ERROR: db_core_add_op failed (user=%d, rc=%d)\n", i, rc);
@@ -439,7 +439,10 @@ static int run_single_put_run(int batch_size, double* out_total_us)
  * @brief Run the full benchmark for a given pattern (batch_size).
  */
 static int run_put_benchmark(const char* label,
+                             const char* dbi_name,
+                             dbi_type_t  dbi_type,
                              int         batch_size,
+                             bool        reverse_keys,
                              const char* output_file)
 {
     sys_info_t sys_info = {0};
@@ -452,8 +455,7 @@ static int run_put_benchmark(const char* label,
         return -ENOMEM;
     }
 
-    printf("=================================================================\n");
-    printf("Database PUT Benchmark (%s)\n", label);
+    printf("\n=== %s ===\n", label);
 
     bench_print_system_info(stdout, &sys_info);
 
@@ -463,16 +465,19 @@ static int run_put_benchmark(const char* label,
     printf("NOT Measured:   Environment/DBI init, shutdown, directory cleanup\n");
     printf("Users per run:  %d\n", BENCH_NUM_USERS);
     printf("Value size:     %d bytes\n", BENCH_VALUE_SIZE);
+    printf("Append mode:    %s\n", (dbi_type & DBI_TYPE_APPENDABLE) ? "yes" : "no");
+    printf("Key order:      %s\n", reverse_keys ? "descending (worst-case)" : "ascending");
     printf("Batch size:     %d\n", batch_size <= 1 ? 1 : batch_size);
     printf("Runs:           %d\n", BENCH_RUNS);
     printf("DB Path:        %s\n", BENCH_DB_PATH);
     printf("DB Mode:        0%o\n", BENCH_DB_MODE);
-    printf("\n");
+    printf("\nRunning %d runs...\n", BENCH_RUNS);
 
     for(int run = 0; run < BENCH_RUNS; ++run)
     {
         double total_us = 0.0;
-        int    rc       = run_single_put_run(batch_size, &total_us);
+        int    rc       = run_single_put_run(dbi_name, dbi_type, batch_size, reverse_keys,
+                                             &total_us);
         if(rc != 0)
         {
             fprintf(stderr, "ERROR: Benchmark run %d failed with rc=%d\n", run + 1, rc);
@@ -480,10 +485,6 @@ static int run_put_benchmark(const char* label,
             return rc;
         }
         all_times[run] = total_us;
-
-        printf("  Run %2d/%d: total = %.2f μs (%.4f ms), per-op ≈ %.2f μs\n", run + 1,
-               BENCH_RUNS, total_us, total_us / 1000.0,
-               total_us / (double)BENCH_NUM_USERS);
     }
 
     /* Compute statistics on total run times. */
@@ -545,6 +546,9 @@ static int run_put_benchmark(const char* label,
     fprintf(fp, "NOT Measured:      Environment/DBI init, shutdown, directory cleanup\n");
     fprintf(fp, "Users per run:     %d\n", BENCH_NUM_USERS);
     fprintf(fp, "Value size:        %d bytes\n", BENCH_VALUE_SIZE);
+    fprintf(fp, "Append mode:       %s\n", (dbi_type & DBI_TYPE_APPENDABLE) ? "yes" : "no");
+    fprintf(fp, "Key order:         %s\n", reverse_keys ? "descending (worst-case)"
+                                                     : "ascending");
     fprintf(fp, "Batch size:        %d\n", batch_size <= 1 ? 1 : batch_size);
     fprintf(fp, "Runs:              %d\n", BENCH_RUNS);
     fprintf(fp, "DB Path:           %s\n", BENCH_DB_PATH);
@@ -582,14 +586,18 @@ static int run_put_benchmark(const char* label,
     fclose(fp);
     free(all_times);
 
-    printf("Detailed results written to: %s\n\n", output_file);
+    printf("Summary complete. Detailed results written to: %s\n\n", output_file);
     return 0;
 }
 
 int main(void)
 {
-    const char* output_single = "tests/benchmarks/results/bench_put_users_single.txt";
-    const char* output_batch8 = "tests/benchmarks/results/bench_put_users_batch8.txt";
+    const char* output_single        = "tests/benchmarks/results/bench_write_single.txt";
+    const char* output_single_append = "tests/benchmarks/results/bench_write_single_append.txt";
+    const char* output_batch8        = "tests/benchmarks/results/bench_write_batch8.txt";
+    const char* output_batch8_append = "tests/benchmarks/results/bench_write_batch8_append.txt";
+    const char* dbi_name_normal      = "bench_users";
+    const char* dbi_name_appendable  = "bench_users_append";
 
     bench_silence_emlog();
 
@@ -613,29 +621,46 @@ int main(void)
     init_test_data();
 
     int rc_single =
-        run_put_benchmark("Single PUT (no batching)", 1, output_single);
+        run_put_benchmark("Single PUT (no append)", dbi_name_normal, DBI_TYPE_DEFAULT, 1,
+                          true, output_single);
     if(rc_single != 0)
     {
         fprintf(stderr, "Single PUT benchmark failed with rc=%d\n", rc_single);
     }
 
-    /* Clean up completely between patterns. */
-    (void)remove_directory(BENCH_DB_PATH);
+    int rc_single_append =
+        run_put_benchmark("Single PUT (append)", dbi_name_appendable, DBI_TYPE_APPENDABLE, 1,
+                          false, output_single_append);
+    if(rc_single_append != 0)
+    {
+        fprintf(stderr, "Single append PUT benchmark failed with rc=%d\n", rc_single_append);
+    }
 
     int rc_batch =
-        run_put_benchmark("Batched PUT (8 ops)", BENCH_BATCH_SIZE, output_batch8);
+        run_put_benchmark("Batched PUT (8 ops, no append)", dbi_name_normal, DBI_TYPE_DEFAULT,
+                          BENCH_BATCH_SIZE, true, output_batch8);
     if(rc_batch != 0)
     {
         fprintf(stderr, "Batched PUT benchmark failed with rc=%d\n", rc_batch);
     }
 
-    if(rc_single == 0 && rc_batch == 0)
+    int rc_batch_append =
+        run_put_benchmark("Batched PUT (8 ops, append)", dbi_name_appendable,
+                          DBI_TYPE_APPENDABLE, BENCH_BATCH_SIZE, false, output_batch8_append);
+    if(rc_batch_append != 0)
+    {
+        fprintf(stderr, "Batched append PUT benchmark failed with rc=%d\n", rc_batch_append);
+    }
+
+    if(rc_single == 0 && rc_single_append == 0 && rc_batch == 0 && rc_batch_append == 0)
     {
         printf("All PUT benchmarks completed successfully!\n");
         return 0;
     }
 
-    fprintf(stderr, "One or more PUT benchmarks failed (single rc=%d, batch rc=%d)\n",
-            rc_single, rc_batch);
+    fprintf(stderr,
+            "One or more PUT benchmarks failed (single rc=%d, single append rc=%d, batch rc=%d, "
+            "batch append rc=%d)\n",
+            rc_single, rc_single_append, rc_batch, rc_batch_append);
     return 1;
 }

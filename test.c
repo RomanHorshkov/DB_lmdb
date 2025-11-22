@@ -19,7 +19,7 @@ int main(void)
                                       "auth_dbi" };
     const dbi_type_t dbi_types[]  = { DBI_TYPE_NOOVERWRITE,
                                       DBI_TYPE_NOOVERWRITE,
-                                      DBI_TYPE_NOOVERWRITE };
+                                      DBI_TYPE_NOOVERWRITE | DBI_TYPE_APPENDABLE };
 
     int rc = db_core_init(db_path, DB_LMDB_ENV_MODE, dbi_names, dbi_types, n_dbis);
     if(rc != 0)
@@ -27,6 +27,10 @@ int main(void)
         fprintf(stderr, "db_core_init failed: %d\n", rc);
         return 1;
     }
+
+    uint8_t auth_k1[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    uint8_t auth_k2[8] = {0, 1, 2, 3, 4, 5, 6, 8};
+    uint8_t auth_k3[8] = {0, 1, 2, 3, 4, 5, 6, 9};
     /* Initialize EMlogger with debug level and timestamps. */
     emlog_init(EML_LEVEL_DBG, true);
 
@@ -37,8 +41,14 @@ int main(void)
                          (const void*)"device_1", sizeof("device_1"),
                          (const void*)"device1_val", sizeof("device1_val"));
     rc = db_core_add_op(2, DB_OPERATION_PUT,
-                         (const void*)"auth_1", sizeof("auth_1"),
-                         (const void*)"auth1_val", sizeof("auth1_val"));
+                         (const void*)auth_k1, sizeof(uint8_t) * 8,
+                         (const void*)"auth_val1", sizeof("auth_val1"));
+    rc = db_core_add_op(2, DB_OPERATION_PUT,
+                         (const void*)auth_k2, sizeof(uint8_t) * 8,
+                         (const void*)"auth_val2", sizeof("auth_val2"));
+    rc = db_core_add_op(2, DB_OPERATION_PUT,
+                         (const void*)auth_k3, sizeof(uint8_t) * 8,
+                         (const void*)"auth_val3", sizeof("auth_val3"));
 
     rc = db_core_exec_ops();
 
@@ -54,7 +64,7 @@ int main(void)
                          (const void*)"device_1", sizeof("device_1"),
                          val_buf2, 64);
     rc = db_core_add_op(2, DB_OPERATION_GET,
-                         (const void*)"auth_1", sizeof("auth_1"),
+                         (const void*)auth_k1, sizeof(auth_k1),
                          NULL, sizeof("auth1_val")); /* no user buffer */
 
     rc = db_core_exec_ops();

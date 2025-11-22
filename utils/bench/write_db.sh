@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# run_bench2.sh - Run batched vs non-batched PUT benchmark
+# run_bench2.sh - Run write benchmarks (single/batched, append/non-append)
 #
-# This script builds and executes the bench_db_ops_batch benchmark.
-# Results are stored in tests/benchmarks/results/
+# This script builds and executes the bench_db_write benchmark.
+# Results are stored in tests/benchmarks/results/.
 #
 
 set -euo pipefail
@@ -13,7 +13,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # Configuration
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
-BENCHMARK="${BENCHMARK:-bench_db_ops_batch}"
+BENCHMARK="${BENCHMARK:-bench_db_write}"
 RESULTS_DIR="${ROOT_DIR}/tests/benchmarks/results"
 
 echo "========================================"

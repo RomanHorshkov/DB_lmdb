@@ -332,8 +332,10 @@ db_security_ret_code_t ops_init_dbi(MDB_txn* const txn, const char* const name,
     dbi->is_dupsort  = (dbi->db_flags & MDB_DUPSORT) != 0;
     dbi->is_dupfixed = (dbi->db_flags & MDB_DUPFIXED) != 0;
 
-    EML_INFO(LOG_TAG, "ops_init_dbi: DBI[%u] \"%s\" ready (db_flags=0x%x dupsort=%u dupfixed=%u)",
-             dbi_idx, name, dbi->db_flags, dbi->is_dupsort, dbi->is_dupfixed);
+    EML_INFO(LOG_TAG,
+             "ops_init_dbi: DBI[%u] \"%s\" ready (db_flags=0x%x, db_put_flags=0x%x, dupsort=%u "
+             "dupfixed=%u)",
+             dbi_idx, name, dbi->db_flags, dbi->put_flags, dbi->is_dupsort, dbi->is_dupfixed);
 
     return DB_SAFETY_SUCCESS;
 }
