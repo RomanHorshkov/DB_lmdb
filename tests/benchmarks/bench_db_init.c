@@ -12,7 +12,7 @@
  * each iteration to ensure every measurement is a true "from scratch" init.
  */
 
-#include "core.h"
+#include "db_lmdb_core.h"
 #include "bench_logging.h"
 #include "bench_system_info.h"
 #include <dirent.h>

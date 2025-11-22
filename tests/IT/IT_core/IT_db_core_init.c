@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "core.h"
+#include "db_lmdb_core.h"
 
 static const char* k_test_db_path = "./it_db_core_init_db";
 

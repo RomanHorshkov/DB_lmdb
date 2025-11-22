@@ -5,7 +5,7 @@
 
 #include "emlog.h"
 #include "core/common.h"
-#include "core.h"
+#include "db_lmdb_core.h"
 
 int main(void)
 {

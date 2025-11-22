@@ -7,7 +7,7 @@
 #include <stdlib.h>        /* calloc, free */
 
 #include "common.h"        /* EML_* macros, LMDB_EML_* */
-#include "core.h"
+#include "db_lmdb_core.h"
 #include "db.h"            /* DataBase_t, MDB_envinfo */
 #include "dbi_int.h"       /* dbi_t */
 #include "ops_actions.h"   /* act_txn_begin, act_txn_commit */
