@@ -16,9 +16,9 @@ BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BENCHMARK="${BENCHMARK:-bench_db_init}"
 RESULTS_DIR="${ROOT_DIR}/tests/benchmarks/results"
 
-echo "========================================"
-echo "Database Benchmark Runner"
-echo "========================================"
+echo "==============================================================================="
+echo "                      Database Benchmark Runner"
+echo "==============================================================================="
 echo
 
 # Step 1: Build the benchmark if needed
@@ -38,13 +38,12 @@ fi
 mkdir -p "${RESULTS_DIR}"
 
 # Step 3: Run the benchmark
+echo "==============================================================================="
 echo "Running benchmark: ${BENCHMARK}"
-echo "========================================"
 echo
 
 "${BUILD_DIR}/${BENCHMARK}"
 
 echo
-echo "========================================"
 echo "Benchmark execution completed!"
-echo "========================================"
+echo "==============================================================================="

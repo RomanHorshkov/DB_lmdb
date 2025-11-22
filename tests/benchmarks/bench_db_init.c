@@ -13,6 +13,8 @@
  */
 
 #include "core.h"
+#include "bench_logging.h"
+#include "bench_system_info.h"
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
@@ -31,18 +33,6 @@
 #define BENCH_ITERATIONS 100    /* Total number of init operations to test */
 #define BENCH_DB_PATH "/tmp/bench_lmdb_test"
 #define BENCH_DB_MODE 0700
-
-/* System information structure */
-typedef struct {
-    char hostname[256];
-    char cpu_model[256];
-    char os_info[256];
-    long cpu_cores;
-    long cpu_freq_mhz;
-    unsigned long total_ram_mb;
-    char storage_type[64];  /* SSD or HDD */
-    char filesystem[64];
-} sys_info_t;
 
 /* Statistics structure */
 typedef struct {
@@ -330,21 +320,9 @@ static int run_benchmark(const char* label,
     
     printf("=================================================================\n");
     printf("Database Initialization Benchmark (%s, FROM SCRATCH)\n", label);
-    printf("=================================================================\n");
     printf("\n");
-    printf("SYSTEM INFORMATION:\n");
-    printf("-------------------\n");
-    printf("Hostname:       %s\n", sys_info.hostname);
-    printf("OS:             %s\n", sys_info.os_info);
-    printf("CPU:            %s\n", sys_info.cpu_model);
-    printf("CPU Cores:      %ld\n", sys_info.cpu_cores);
-    printf("CPU Frequency:  %ld MHz\n", sys_info.cpu_freq_mhz);
-    printf("Total RAM:      %lu MB\n", sys_info.total_ram_mb);
-    printf("Storage Type:   %s\n", sys_info.storage_type);
-    printf("Filesystem:     %s\n", sys_info.filesystem);
-    printf("\n");
+    bench_print_system_info(stdout, &sys_info);
     printf("BENCHMARK CONFIGURATION:\n");
-    printf("------------------------\n");
     printf("Test Type:      Database initialization ONLY (from scratch)\n");
     printf("Measured:       Folder creation + environment setup time\n");
     printf("NOT Measured:   Shutdown/cleanup time\n");
@@ -352,10 +330,8 @@ static int run_benchmark(const char* label,
     printf("DB Path:        %s\n", BENCH_DB_PATH);
     printf("DB Mode:        0%o\n", BENCH_DB_MODE);
     printf("Sub-DBIs:       %u\n", n_dbis);
-    printf("=================================================================\n\n");
-    
-    printf("Running benchmark...\n");
-    
+    printf("\n");
+
     /* Run all iterations */
     for (int iter = 0; iter < BENCH_ITERATIONS; iter++) {
         /* Measure ONLY initialization time (NOT shutdown) */
@@ -379,8 +355,6 @@ static int run_benchmark(const char* label,
         }
     }
     
-    printf("\nBenchmark completed!\n\n");
-    
     /* Calculate statistics */
     stats_t stats;
     /* Use a sorted copy for statistics so that the original per-iteration
@@ -397,9 +371,8 @@ static int run_benchmark(const char* label,
     free(sorted);
     
     /* Display results to console */
-    printf("=================================================================\n");
+    printf("\n");
     printf("DATABASE INITIALIZATION RESULTS (from scratch, per operation)\n");
-    printf("=================================================================\n");
     printf("Total Iterations:  %d\n", BENCH_ITERATIONS);
     printf("\nPer-Operation Statistics:\n");
     printf("  Mean:            %.2f μs (%.4f ms)\n", stats.mean, stats.mean / 1000.0);
@@ -407,7 +380,7 @@ static int run_benchmark(const char* label,
     printf("  Median:          %.2f μs (%.4f ms)\n", stats.median, stats.median / 1000.0);
     printf("  Min:             %.2f μs (%.4f ms)\n", stats.min, stats.min / 1000.0);
     printf("  Max:             %.2f μs (%.4f ms)\n", stats.max, stats.max / 1000.0);
-    printf("=================================================================\n\n");
+    printf("\n");
     
     /* Write detailed results to file */
     FILE* fp = fopen(output_file, "w");
@@ -424,9 +397,9 @@ static int run_benchmark(const char* label,
     time_t now = time(NULL);
     fprintf(fp, "Timestamp: %s\n", ctime(&now));
     
-    fprintf(fp, "═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "SYSTEM INFORMATION\n");
-    fprintf(fp, "═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "Hostname:          %s\n", sys_info.hostname);
     fprintf(fp, "Operating System:  %s\n", sys_info.os_info);
     fprintf(fp, "CPU Model:         %s\n", sys_info.cpu_model);
@@ -436,9 +409,9 @@ static int run_benchmark(const char* label,
     fprintf(fp, "Storage Type:      %s\n", sys_info.storage_type);
     fprintf(fp, "Filesystem:        %s\n", sys_info.filesystem);
     
-    fprintf(fp, "\n═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "BENCHMARK CONFIGURATION\n");
-    fprintf(fp, "═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "Test Type:         Database initialization ONLY (from scratch)\n");
     fprintf(fp, "What is Measured:  Folder creation + environment setup time\n");
     fprintf(fp, "NOT Measured:      Shutdown/cleanup time (excluded)\n");
@@ -449,9 +422,9 @@ static int run_benchmark(const char* label,
     fprintf(fp, "Note:              Each iteration starts from a completely clean state\n");
     fprintf(fp, "                   (directory deleted between iterations)\n");
     
-    fprintf(fp, "\n═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "RESULTS - Per-Operation Statistics\n");
-    fprintf(fp, "═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "Operations Tested: %d (each from scratch)\n\n", BENCH_ITERATIONS);
     fprintf(fp, "Mean:              %12.2f μs  (%10.6f ms)\n", stats.mean, stats.mean / 1000.0);
     fprintf(fp, "Standard Deviation:%12.2f μs  (%10.6f ms)\n", stats.std_dev, stats.std_dev / 1000.0);
@@ -459,9 +432,9 @@ static int run_benchmark(const char* label,
     fprintf(fp, "Minimum:           %12.2f μs  (%10.6f ms)\n", stats.min, stats.min / 1000.0);
     fprintf(fp, "Maximum:           %12.2f μs  (%10.6f ms)\n", stats.max, stats.max / 1000.0);
     
-    fprintf(fp, "\n═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     fprintf(fp, "DETAILED TIMING DATA (all %d operations)\n", BENCH_ITERATIONS);
-    fprintf(fp, "═══════════════════════════════════════════════════════════════\n");
+    fprintf(fp, "\n");
     for (int i = 0; i < BENCH_ITERATIONS; i++) {
         fprintf(fp, "Iteration %4d: %12.2f μs  (%10.6f ms)\n", i + 1, all_times[i], all_times[i] / 1000.0);
     }
@@ -477,6 +450,8 @@ static int run_benchmark(const char* label,
 int main(int argc, char* argv[]) {
     const char* output_file_1  = "tests/benchmarks/results/bench_db_init_results_1dbi.txt";
     const char* output_file_10 = "tests/benchmarks/results/bench_db_init_results_10dbis.txt";
+
+    bench_silence_emlog();
 
     /* Allow overriding the base output file from command line (1 DBI case). */
     if(argc > 1)

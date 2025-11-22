@@ -17,6 +17,8 @@
  */
 
 #include "core.h"
+#include "bench_logging.h"
+#include "bench_system_info.h"
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
@@ -39,19 +41,6 @@
 #define BENCH_NUM_GETS       1000
 #define BENCH_RUNS           10
 #define BENCH_BATCH_SIZE     8
-
-/* System information structure */
-typedef struct
-{
-    char           hostname[256];
-    char           cpu_model[256];
-    char           os_info[256];
-    long           cpu_cores;
-    long           cpu_freq_mhz;
-    unsigned long  total_ram_mb;
-    char           storage_type[64]; /* SSD or HDD */
-    char           filesystem[64];
-} sys_info_t;
 
 /* Statistics structure */
 typedef struct
@@ -544,20 +533,9 @@ static int run_get_benchmark(const char* label,
     printf("Database GET Benchmark (%s)\n", label);
     printf("=================================================================\n\n");
 
-    printf("SYSTEM INFORMATION:\n");
-    printf("-------------------\n");
-    printf("Hostname:       %s\n", sys_info.hostname);
-    printf("OS:             %s\n", sys_info.os_info);
-    printf("CPU:            %s\n", sys_info.cpu_model);
-    printf("CPU Cores:      %ld\n", sys_info.cpu_cores);
-    printf("CPU Frequency:  %ld MHz\n", sys_info.cpu_freq_mhz);
-    printf("Total RAM:      %lu MB\n", sys_info.total_ram_mb);
-    printf("Storage Type:   %s\n", sys_info.storage_type);
-    printf("Filesystem:     %s\n", sys_info.filesystem);
-    printf("\n");
+    bench_print_system_info(stdout, &sys_info);
 
     printf("BENCHMARK CONFIGURATION:\n");
-    printf("------------------------\n");
     printf("Test Type:      GET operations from single DBI\n");
     printf("Measured:       db_core_add_op + db_core_exec_ops only\n");
     printf("NOT Measured:   Environment/DBI init, population, shutdown, directory cleanup\n");
@@ -569,8 +547,6 @@ static int run_get_benchmark(const char* label,
     printf("DB Path:        %s\n", BENCH_DB_PATH);
     printf("DB Mode:        0%o\n", BENCH_DB_MODE);
     printf("=================================================================\n\n");
-
-    printf("Running benchmark...\n");
 
     for(int run = 0; run < BENCH_RUNS; ++run)
     {
@@ -588,8 +564,6 @@ static int run_get_benchmark(const char* label,
                BENCH_RUNS, total_us, total_us / 1000.0,
                total_us / (double)BENCH_NUM_GETS);
     }
-
-    printf("\nBenchmark completed!\n\n");
 
     /* Compute statistics on total run times. */
     stats_t stats;
@@ -698,6 +672,8 @@ int main(void)
     const char* output_single = "tests/benchmarks/results/bench_get_users_single.txt";
     const char* output_batch8 = "tests/benchmarks/results/bench_get_users_batch8.txt";
 
+    bench_silence_emlog();
+
     /* Ensure results directory exists. */
     struct stat st;
     if(stat("tests/benchmarks/results", &st) != 0)
@@ -744,4 +720,3 @@ int main(void)
             rc_single, rc_batch);
     return 1;
 }
-
