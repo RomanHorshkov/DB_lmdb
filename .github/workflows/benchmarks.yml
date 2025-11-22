@@ -45,9 +45,6 @@ jobs:
       - name: Run GET benchmark (read_db)
         run: ./utils/bench/read_db.sh
 
-      - name: Run multithreaded GET benchmark (read_db_mt)
-        run: ./utils/bench/read_db_mt.sh
-
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:

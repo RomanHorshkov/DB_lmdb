@@ -268,19 +268,3 @@ target_link_libraries(bench_db_get_batch
         db_core
         m  # Math library for sqrt()
 )
-
-add_executable(bench_db_read_mt
-    tests/benchmarks/bench_db_read_mt.c
-)
-
-target_include_directories(bench_db_read_mt
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/app/include
-)
-
-target_link_libraries(bench_db_read_mt
-    PRIVATE
-        db_core
-        m
-        pthread
-)
