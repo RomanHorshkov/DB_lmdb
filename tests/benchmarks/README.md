@@ -91,6 +91,34 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 ./build/bench_db_write
 ```
 
+### bench_db_read_mt - Multithreaded GET Benchmark (batched)
+
+**Purpose**: Measures concurrent read performance when many reader threads fetch the same DBI.
+
+- Populates 1000 records with 512-byte values.
+- Spawns up to a safe number of threads (clamped to 48) sharing one environment/DBI.
+- Each thread reads all keys in batches of 8, copying values into a private buffer.
+- Reports per-run mean/min/max thread times and derived throughput (reads/s).
+
+**Configuration**:
+
+- Users stored: 1000
+- Value size: 512 bytes
+- Batch size: 8 GETs per loop
+- Runs per pattern: 5
+- Threads: min(available cores, 48), at least 2
+- Database path: `/tmp/bench_lmdb_read_mt`
+
+**Output**:
+
+- Console: System info, config, per-run mean/min/max thread time, per-run throughput, and aggregated stats.
+
+**Running**:
+
+```bash
+./build/bench_db_read_mt
+```
+
 ### bench_db_get_batch - GET Operations Benchmark (single vs batched)
 
 **Purpose**: Compares fetching random user records from a single sub-DBI:
