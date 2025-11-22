@@ -336,11 +336,18 @@ static int populate_db_for_gets(void)
 
     for(int i = 0; i < BENCH_NUM_USERS; ++i)
     {
-        rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[i], strlen(g_keys[i]),
-                            (const void*)g_value, BENCH_VALUE_SIZE);
+        rc = db_core_set_op(
+            0u,
+            DB_OPERATION_PUT,
+            &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                         .present = { .data = (void*)g_keys[i],
+                                      .size = strlen(g_keys[i]) } },
+            &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                         .present = { .data = (void*)g_value,
+                                      .size = BENCH_VALUE_SIZE } });
         if(rc != 0)
         {
-            fprintf(stderr, "ERROR: populate_db_for_gets: db_core_add_op failed (user=%d, rc=%d)\n",
+            fprintf(stderr, "ERROR: populate_db_for_gets: db_core_set_op failed (user=%d, rc=%d)\n",
                     i, rc);
             return rc;
         }
@@ -426,12 +433,19 @@ static int run_single_get_run(int batch_size, int run_index, double* out_total_u
             int idx = rand() % BENCH_NUM_USERS;
 
             memset(val_buf, 0, sizeof(val_buf));
-            rc = db_core_add_op(0u, DB_OPERATION_GET, (const void*)g_keys[idx],
-                                strlen(g_keys[idx]), val_buf, BENCH_VALUE_SIZE);
+            rc = db_core_set_op(
+                0u,
+                DB_OPERATION_GET,
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_keys[idx],
+                                          .size = strlen(g_keys[idx]) } },
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)val_buf,
+                                          .size = BENCH_VALUE_SIZE } });
             if(rc != 0)
             {
                 fprintf(stderr,
-                        "ERROR: run_single_get_run: db_core_add_op failed (idx=%d, rc=%d)\n", idx,
+                        "ERROR: run_single_get_run: db_core_set_op failed (idx=%d, rc=%d)\n", idx,
                         rc);
                 (void)db_core_shutdown();
                 return rc;
@@ -458,12 +472,19 @@ static int run_single_get_run(int batch_size, int run_index, double* out_total_u
             int idx = rand() % BENCH_NUM_USERS;
 
             memset(val_buf, 0, sizeof(val_buf));
-            rc = db_core_add_op(0u, DB_OPERATION_GET, (const void*)g_keys[idx],
-                                strlen(g_keys[idx]), val_buf, BENCH_VALUE_SIZE);
+            rc = db_core_set_op(
+                0u,
+                DB_OPERATION_GET,
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_keys[idx],
+                                          .size = strlen(g_keys[idx]) } },
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)val_buf,
+                                          .size = BENCH_VALUE_SIZE } });
             if(rc != 0)
             {
                 fprintf(stderr,
-                        "ERROR: run_single_get_run: db_core_add_op failed (idx=%d, rc=%d)\n", idx,
+                        "ERROR: run_single_get_run: db_core_set_op failed (idx=%d, rc=%d)\n", idx,
                         rc);
                 (void)db_core_shutdown();
                 return rc;
@@ -537,7 +558,7 @@ static int run_get_benchmark(const char* label,
 
     printf("BENCHMARK CONFIGURATION:\n");
     printf("Test Type:      GET operations from single DBI\n");
-    printf("Measured:       db_core_add_op + db_core_exec_ops only\n");
+    printf("Measured:       db_core_set_op + db_core_exec_ops only\n");
     printf("NOT Measured:   Environment/DBI init, population, shutdown, directory cleanup\n");
     printf("Users stored:   %d\n", BENCH_NUM_USERS);
     printf("Value size:     %d bytes\n", BENCH_VALUE_SIZE);
@@ -621,7 +642,7 @@ static int run_get_benchmark(const char* label,
     fprintf(fp, "\nBENCHMARK CONFIGURATION\n");
     fprintf(fp, "------------------------\n");
     fprintf(fp, "Test Type:         GET operations from single DBI\n");
-    fprintf(fp, "What is Measured:  db_core_add_op + db_core_exec_ops only\n");
+    fprintf(fp, "What is Measured:  db_core_set_op + db_core_exec_ops only\n");
     fprintf(fp, "NOT Measured:      Environment/DBI init, population, shutdown, directory cleanup\n");
     fprintf(fp, "Users stored:      %d\n", BENCH_NUM_USERS);
     fprintf(fp, "Value size:        %d bytes\n", BENCH_VALUE_SIZE);

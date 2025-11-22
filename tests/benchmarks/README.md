@@ -56,7 +56,7 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 
 **What is measured**:
 
-- ONLY the time spent in `db_core_add_op` + `db_core_exec_ops`
+- ONLY the time spent in `db_core_set_op` + `db_core_exec_ops`
 - Database environment/DBI creation and shutdown are excluded
 - Each run starts from a completely clean database directory
 
@@ -100,7 +100,7 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 
 **What is measured**:
 
-- ONLY the time spent in `db_core_add_op` + `db_core_exec_ops` for GET operations
+- ONLY the time spent in `db_core_set_op` + `db_core_exec_ops` for GET operations
 - Database environment/DBI creation, initial population, and shutdown are excluded
 - Each run starts from a completely clean database directory, then:
   - Initializes environment + one DBI

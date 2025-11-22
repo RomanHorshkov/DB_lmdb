@@ -136,8 +136,17 @@ static void test_db_core_add_op_fails_when_not_initialized(void** state)
     const char* key   = "k";
     const char* value = "v";
 
-    int rc = db_core_add_op(0u, DB_OPERATION_PUT, key, 1u, value, 1u);
-    assert_int_equal(rc, -EINVAL);
+    int rc = db_core_set_op(0u, DB_OPERATION_PUT,
+        &(op_key_t){
+        .kind = OP_KEY_KIND_PRESENT,
+        .present = { .data = (void*)key,
+                     .size = 1 }},
+        &(op_key_t){
+        .kind = OP_KEY_KIND_PRESENT,
+        .present = { .data = (void*)value,
+                     .size = 1 }});
+
+    assert_int_equal(rc, -ENOENT);
 }
 
 static void test_db_core_add_op_invalid_type_and_key(void** state)
@@ -154,19 +163,43 @@ static void test_db_core_add_op_invalid_type_and_key(void** state)
     const char* val = "val";
 
     /* Type lower than PUT (DB_OPERATION_NONE). */
-    rc = db_core_add_op(0u, DB_OPERATION_NONE, key, 3u, val, 3u);
+    rc = db_core_set_op(0u, DB_OPERATION_NONE,
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = (void*)key,
+                                  .size = 3 } },
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = (void*)val,
+                                  .size = 3 } } );
     assert_int_equal(rc, -EINVAL);
 
-    /* Type higher than GET (e.g. DEL). */
-    rc = db_core_add_op(0u, DB_OPERATION_DEL, key, 3u, val, 3u);
+    /* Invalid key fails */
+    rc = db_core_set_op(0u, DB_OPERATION_GET,
+        &(op_key_t){ .kind = OP_KEY_KIND_NONE,
+                     .present = { .data = (void*)key,
+                                  .size = 3 } },
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = (void*)val,
+                                  .size = 3 } } );
     assert_int_equal(rc, -EINVAL);
 
-    /* Null key with non-zero size should fail. */
-    rc = db_core_add_op(0u, DB_OPERATION_PUT, NULL, 3u, val, 3u);
+    /* Valid key and invalid data ptr fails */
+    rc = db_core_set_op(0u, DB_OPERATION_GET,
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = NULL,
+                                  .size = 3 } },
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = NULL,
+                                  .size = 3 } } );
     assert_int_equal(rc, -EINVAL);
 
-    /* Zero-size key should also fail even if pointer is non-NULL. */
-    rc = db_core_add_op(0u, DB_OPERATION_GET, key, 0u, NULL, 0u);
+    /* Valid key and invalid data size fails */
+    rc = db_core_set_op(0u, DB_OPERATION_GET,
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = (void*)key,
+                                  .size = (size_t)0 } },
+        &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                     .present = { .data = (void*)val,
+                                  .size = 3 } } );
     assert_int_equal(rc, -EINVAL);
 }
 
@@ -187,7 +220,13 @@ static void test_db_core_add_op_overflow_cache_returns_enomem(void** state)
     int last_rc = 0;
     for(int i = 0; i < 64; ++i)
     {
-        last_rc = db_core_add_op(0u, DB_OPERATION_PUT, key, 3u, val, 5u);
+        last_rc = db_core_set_op(0u, DB_OPERATION_PUT,
+            &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                         .present = { .data = (void*)key,
+                                      .size = 3 } },
+            &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                         .present = { .data = (void*)val,
+                                      .size = 5 } } );
         if(last_rc != 0) break;
     }
 

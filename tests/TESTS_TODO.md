@@ -96,10 +96,10 @@ This file summarizes issues, oddities, and potential improvements discovered whi
   - Both `_exec_rw_ops()` and `_exec_ro_ops()` clear `ops_cache` on exit, and `ops_execute_operations()` also clears it after dispatching. Double-clearing is harmless but redundant; however, any new code that expects `ops_cache` contents *after* execution will be broken.
 
 - **RW cache semantics**  
-  - `_rw_cache_alloc()` correctly rejects allocations that exceed `DB_LMDB_RW_OPS_CACHE_SIZE`, returning NULL and keeping `rw_cache_used` unchanged.  
+  - `_rw_cache_alloc()` correctly rejects allocations that exceed `DB_RW_OPS_CACHE_SIZE`, returning NULL and keeping `rw_cache_used` unchanged.  
   - `_exec_op()` for GET in RW batches:
-    - Relies on `act_get()` guaranteeing a PRESENT value; if `present.ptr` or `present.size` is invalid, it returns `DB_SAFETY_FAIL` and may set `*out_err = -EIO`.  
-    - Copies the GET result into the internal RW cache and rewrites `op->val.present.ptr` to point into this cache.  
+    - Relies on `act_get()` guaranteeing a PRESENT value; if `present.data` or `present.size` is invalid, it returns `DB_SAFETY_FAIL` and may set `*out_err = -EIO`.  
+    - Copies the GET result into the internal RW cache and rewrites `op->val.present.data` to point into this cache.  
   - This design is subtle: callers must not assume the pointer returned by `act_get()` is stable; they must use `op->val` after `_exec_op()` has run, not before.
 
 - **Retry loops**  
@@ -126,4 +126,3 @@ This file summarizes issues, oddities, and potential improvements discovered whi
   - When adding new features, prefer writing UTs that target specific branches instead of relying solely on ITs or manual testing.
 
 These notes are intentionally conservative: tests assert behavior where it is clear and strictly defined; where semantics are ambiguous or surprising, UTs avoid locking in questionable behavior and this document instead flags them for future design decisions or fixes. 
-

@@ -2,7 +2,7 @@
  * @file bench_db_write.c
  * @brief Benchmark write paths (single vs batched) with/without append fast-path.
  *
- * Measures ONLY db_core_add_op + db_core_exec_ops time for four scenarios:
+ * Measures ONLY db_core_set_op + db_core_exec_ops time for four scenarios:
  *   - Single PUTs, normal
  *   - Single PUTs, appendable
  *   - Batched PUTs, normal
@@ -328,7 +328,7 @@ static void init_test_data(void)
  * The run:
  *   - starts from a clean directory
  *   - creates the environment + single DBI
- *   - measures ONLY the time spent in db_core_add_op/db_core_exec_ops
+ *   - measures ONLY the time spent in db_core_set_op/db_core_exec_ops
  *   - shuts down the database (not timed)
  */
 static int run_single_put_run(const char* dbi_name, dbi_type_t dbi_type, int batch_size,
@@ -359,11 +359,18 @@ static int run_single_put_run(const char* dbi_name, dbi_type_t dbi_type, int bat
         for(int i = 0; i < BENCH_NUM_USERS; ++i)
         {
             int key_idx = reverse_keys ? (BENCH_NUM_USERS - 1 - i) : i;
-            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[key_idx],
-                                strlen(g_keys[key_idx]), (const void*)g_value, BENCH_VALUE_SIZE);
+            rc = db_core_set_op(
+                0u,
+                DB_OPERATION_PUT,
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_keys[key_idx],
+                                          .size = strlen(g_keys[key_idx]) } },
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_value,
+                                          .size = BENCH_VALUE_SIZE } });
             if(rc != 0)
             {
-                fprintf(stderr, "ERROR: db_core_add_op failed (user=%d, rc=%d)\n", i, rc);
+                fprintf(stderr, "ERROR: db_core_set_op failed (user=%d, rc=%d)\n", i, rc);
                 (void)db_core_shutdown();
                 return rc;
             }
@@ -385,11 +392,18 @@ static int run_single_put_run(const char* dbi_name, dbi_type_t dbi_type, int bat
         for(int i = 0; i < BENCH_NUM_USERS; ++i)
         {
             int key_idx = reverse_keys ? (BENCH_NUM_USERS - 1 - i) : i;
-            rc = db_core_add_op(0u, DB_OPERATION_PUT, (const void*)g_keys[key_idx],
-                                strlen(g_keys[key_idx]), (const void*)g_value, BENCH_VALUE_SIZE);
+            rc = db_core_set_op(
+                0u,
+                DB_OPERATION_PUT,
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_keys[key_idx],
+                                          .size = strlen(g_keys[key_idx]) } },
+                &(op_key_t){ .kind = OP_KEY_KIND_PRESENT,
+                             .present = { .data = (void*)g_value,
+                                          .size = BENCH_VALUE_SIZE } });
             if(rc != 0)
             {
-                fprintf(stderr, "ERROR: db_core_add_op failed (user=%d, rc=%d)\n", i, rc);
+                fprintf(stderr, "ERROR: db_core_set_op failed (user=%d, rc=%d)\n", i, rc);
                 (void)db_core_shutdown();
                 return rc;
             }
@@ -461,7 +475,7 @@ static int run_put_benchmark(const char* label,
 
     printf("BENCHMARK CONFIGURATION:\n");
     printf("Test Type:      PUT operations into single DBI\n");
-    printf("Measured:       db_core_add_op + db_core_exec_ops only\n");
+    printf("Measured:       db_core_set_op + db_core_exec_ops only\n");
     printf("NOT Measured:   Environment/DBI init, shutdown, directory cleanup\n");
     printf("Users per run:  %d\n", BENCH_NUM_USERS);
     printf("Value size:     %d bytes\n", BENCH_VALUE_SIZE);
@@ -542,7 +556,7 @@ static int run_put_benchmark(const char* label,
     fprintf(fp, "\nBENCHMARK CONFIGURATION\n");
     fprintf(fp, "------------------------\n");
     fprintf(fp, "Test Type:         PUT operations into single DBI\n");
-    fprintf(fp, "What is Measured:  db_core_add_op + db_core_exec_ops only\n");
+    fprintf(fp, "What is Measured:  db_core_set_op + db_core_exec_ops only\n");
     fprintf(fp, "NOT Measured:      Environment/DBI init, shutdown, directory cleanup\n");
     fprintf(fp, "Users per run:     %d\n", BENCH_NUM_USERS);
     fprintf(fp, "Value size:        %d bytes\n", BENCH_VALUE_SIZE);

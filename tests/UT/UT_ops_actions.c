@@ -211,12 +211,12 @@ static void test_act_put_success_uses_dbi_flags_and_resolved_kv(void** state)
 
     char key_buf[3] = { 'k', 'e', 'y' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
     char val_buf[2] = { 'v', '1' };
     op.val.kind         = OP_KEY_KIND_PRESENT;
-    op.val.present.ptr  = val_buf;
+    op.val.present.data  = val_buf;
     op.val.present.size = sizeof(val_buf);
 
     g_ut_mdb_put = ut_put_capture;
@@ -276,12 +276,12 @@ static void test_act_put_lmdb_error_goes_through_security_check(void** state)
 
     char key_buf[1] = { 'k' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
     char val_buf[1] = { 'v' };
     op.val.kind         = OP_KEY_KIND_PRESENT;
-    op.val.present.ptr  = val_buf;
+    op.val.present.data  = val_buf;
     op.val.present.size = sizeof(val_buf);
 
     g_ut_mdb_put = ut_put_fail_map_full;
@@ -309,6 +309,23 @@ static void test_act_get_rejects_invalid_input(void** state)
     assert_int_equal(act_get((MDB_txn*)0x60, NULL, &err), DB_SAFETY_FAIL);
 }
 
+static void ut_prepare_db_for_get(void)
+{
+    static dbi_t      dbis[1];
+    static DataBase_t db;
+
+    memset(dbis, 0, sizeof(dbis));
+    memset(&db, 0, sizeof(db));
+
+    db.env                = (MDB_env*)0x70;
+    db.dbis               = dbis;
+    db.n_dbis             = 1u;
+    db.map_size_bytes_max = 0u;
+    dbis[0].dbi           = 1u;
+
+    DataBase = &db;
+}
+
 static int ut_get_success_in_place_buffer(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* val)
 {
     (void)txn;
@@ -332,14 +349,15 @@ static void test_act_get_copies_into_user_buffer_when_present(void** state)
 
     char key_buf[3] = { 'k', 'e', 'y' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
     char val_buf[8] = { 0 };
     op.val.kind         = OP_KEY_KIND_PRESENT;
-    op.val.present.ptr  = val_buf;
+    op.val.present.data  = val_buf;
     op.val.present.size = sizeof(val_buf);
 
+    ut_prepare_db_for_get();
     g_ut_mdb_get = ut_get_success_in_place_buffer;
 
     int err = 0;
@@ -373,11 +391,12 @@ static void test_act_get_populates_present_when_no_buffer(void** state)
 
     char key_buf[1] = { 'k' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
     op.val.kind = OP_KEY_KIND_NONE;
 
+    ut_prepare_db_for_get();
     g_ut_mdb_get = ut_get_success_no_user_buffer;
 
     int err = 0;
@@ -387,7 +406,7 @@ static void test_act_get_populates_present_when_no_buffer(void** state)
     assert_int_equal(err, 0);
     assert_int_equal(op.val.kind, OP_KEY_KIND_PRESENT);
     assert_int_equal(op.val.present.size, 1u);
-    assert_non_null(op.val.present.ptr);
+    assert_non_null(op.val.present.data);
 }
 
 static int ut_get_sets_large_value(MDB_txn* txn, MDB_dbi dbi, MDB_val* key, MDB_val* val)
@@ -413,14 +432,15 @@ static void test_act_get_user_buffer_too_small_fails(void** state)
 
     char key_buf[1] = { 'k' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
     char val_buf[4];
     op.val.kind         = OP_KEY_KIND_PRESENT;
-    op.val.present.ptr  = val_buf;
+    op.val.present.data  = val_buf;
     op.val.present.size = sizeof(val_buf); /* smaller than mv_size in hook */
 
+    ut_prepare_db_for_get();
     g_ut_mdb_get = ut_get_sets_large_value;
 
     int err = 0;
@@ -449,9 +469,10 @@ static void test_act_get_lmdb_error_maps_via_security_check(void** state)
 
     char key_buf[1] = { 'k' };
     op.key.kind         = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = key_buf;
+    op.key.present.data  = key_buf;
     op.key.present.size = sizeof(key_buf);
 
+    ut_prepare_db_for_get();
     g_ut_mdb_get = ut_get_fail_notfound;
 
     int err = 0;

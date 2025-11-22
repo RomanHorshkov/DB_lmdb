@@ -12,6 +12,7 @@
 #include <stddef.h>                /* size_t */
 #include "dbi_ext.h"               /* dbi_type_t */
 #include "operations/ops_facade.h" /* op_type_t */
+#include "ops_externals.h"         /* op_key_t */
 
 #ifdef __cplusplus
 extern "C"
@@ -55,29 +56,7 @@ extern "C"
 int db_core_init(const char* const path, const unsigned int mode, const char* const* dbi_names,
                  const dbi_type_t* dbi_types, unsigned n_dbis);
 
-/**
- * @brief Queue a single database operation into the current batch.
- *
- * The operation is described using simple C types; the core converts
- * it into an internal op_t and caches it until @ref db_core_exec_ops
- * is called.
- *
- * For now only DB_OPERATION_PUT and DB_OPERATION_GET are supported; other
- * values will return -EINVAL.
- *
- * The data pointers in @p key and @p val must remain valid until
- * after db_core_exec_ops has been called.
- *
- * @param dbi_idx  Index of the target DBI (0-based).
- * @param type     Operation kind (DB_OPERATION_*).
- * @param key_data Pointer to key bytes.
- * @param key_size Size of key buffer in bytes.
- * @param val_data Pointer to value bytes (for PUT).
- * @param val_size Size of value buffer in bytes (for PUT).
- * @return 0 on success, negative errno-style code on failure.
- */
-int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key_data,
-                   const size_t key_size, const void* val_data, const size_t val_size);
+int db_core_set_op(const unsigned dbi_idx, const op_type_t type, op_key_t* key, op_key_t* val);
 
 /**
  * @brief Execute all queued operations as a single batch.

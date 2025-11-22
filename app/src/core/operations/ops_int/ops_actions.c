@@ -187,7 +187,7 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
         }
 
         /* copy to user buffer */
-        memcpy(op->val.present.ptr, tmp_val.mv_data, tmp_val.mv_size);
+        memcpy(op->val.present.data, tmp_val.mv_data, tmp_val.mv_size);
         /* set actual size */
         op->val.present.size = tmp_val.mv_size;
     }
@@ -198,7 +198,7 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
     {
         op->val.kind    = OP_KEY_KIND_PRESENT;
         /* shallow copy tmp in op's val */
-        op->val.present = *((op_val_t*)&tmp_val);
+        op->val.present = *((op_key_present_t*)&tmp_val);
     }
 
     return DB_SAFETY_SUCCESS;
@@ -230,13 +230,13 @@ static MDB_val* _resolve_desc(op_t* base, op_key_t* desc)
         case OP_KEY_KIND_PRESENT:
             /**
              * Assume that desc->present is already populated, cast it to
-             * MDB_val* and use it directly. This is safe because op_val_t
+             * MDB_val* and use it directly. This is safe because op_key_present_t
              * is layout-compatible with MDB_val.
              */
-            if(!desc->present.ptr || desc->present.size == 0)
+            if(!desc->present.data || desc->present.size == 0)
             {
                 EML_ERROR(LOG_TAG, "_resolve_desc: PRESENT has invalid buffer (ptr=%p size=%zu)",
-                          desc->present.ptr, desc->present.size);
+                          desc->present.data, desc->present.size);
                 return NULL;
             }
             k_ptr = (MDB_val*)&desc->present;

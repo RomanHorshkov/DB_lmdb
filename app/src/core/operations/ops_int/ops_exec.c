@@ -15,7 +15,6 @@
  */
 
 #define LOG_TAG        "db_ops_exec"
-#define OPS_CACHE_SIZE 8
 
 /****************************************************************************
  * PRIVATE STUCTURED VARIABLES
@@ -30,12 +29,12 @@ typedef enum
 typedef struct
 {
     batch_kind_t kind;                /**< Operations batch kind. */
-    op_t         ops[OPS_CACHE_SIZE]; /**< Cached operations. */
+    op_t         ops[DB_OPS_PER_BATCH]; /**< Cached operations. */
     size_t       n_ops;               /**< Number of cached operations. */
     /* Cache needed for RW get operations:
     when get, obtain a ptr which after a read is not valid anymore.
     Thus a necessity to store the get results in a cache arises. */
-    char rw_cache[DB_LMDB_RW_OPS_CACHE_SIZE];
+    char rw_cache[DB_RW_OPS_CACHE_SIZE];
     /* Number of bytes currently used in rw_cache. */
     size_t rw_cache_used;
 } batch_t;
@@ -85,9 +84,9 @@ static inline unsigned int _txn_type_from_batch_type(void)
 
 op_t* ops_get_next_op(void)
 {
-    if(ops_cache.n_ops >= OPS_CACHE_SIZE)
+    if(ops_cache.n_ops >= DB_OPS_PER_BATCH)
     {
-        EML_ERROR(LOG_TAG, "ops_get_next_op: ops cache full, exceeded %d ops", OPS_CACHE_SIZE);
+        EML_ERROR(LOG_TAG, "_get_next_op: required more ops than in batch %d", DB_OPS_PER_BATCH);
         return NULL;
     }
 
@@ -119,19 +118,42 @@ int ops_add_operation(const op_t* operation)
      * current ops count (forward and backwards).
      * With this check later can safely access the prev op during exec.
      */
-    if(operation->key.kind == OP_KEY_KIND_LOOKUP &&
-       operation->key.lookup.op_index > ops_cache.n_ops)
-    {
-        EML_ERROR(LOG_TAG, "_add_op: invalid key lookup index %u (n_ops=%zu)",
-                  operation->key.lookup.op_index, ops_cache.n_ops);
-        return -EINVAL;
-    }
     /* Same for val */
     if(operation->val.kind == OP_KEY_KIND_LOOKUP &&
        operation->val.lookup.op_index > ops_cache.n_ops)
     {
         EML_ERROR(LOG_TAG, "_add_op: invalid val lookup index %u (n_ops=%zu)",
                   operation->val.lookup.op_index, ops_cache.n_ops);
+        return -EINVAL;
+    }
+
+    /**
+     * @note:
+     * Check also key and val
+     */
+    switch (operation->key.kind)
+    {
+    case OP_KEY_KIND_NONE:
+        EML_ERROR(LOG_TAG, "_add_op: invalid key kind (%d)", operation->key.kind);
+        return -EINVAL;
+    case OP_KEY_KIND_PRESENT:
+        if(!operation->key.present.data || operation->key.present.size == 0)
+        {
+            EML_ERROR(LOG_TAG, "_add_op: invalid PRESENT key (ptr=%p size=%zu)",
+                      operation->key.present.data, operation->key.present.size);
+            return -EINVAL;
+        }
+        break;
+    case OP_KEY_KIND_LOOKUP:
+        if(operation->key.lookup.op_index >= ops_cache.n_ops)
+        {
+            EML_ERROR(LOG_TAG, "_add_op: invalid key lookup index %u (n_ops=%zu)",
+                    operation->key.lookup.op_index, ops_cache.n_ops);
+            return -EINVAL;
+        }
+        break;
+    default:
+        EML_ERROR(LOG_TAG, "_add_op: invalid key kind (%d)", operation->key.kind);
         return -EINVAL;
     }
 
@@ -301,7 +323,7 @@ int ops_execute_operations(void)
  */
 static db_security_ret_code_t _exec_ops(MDB_txn* txn, int* const out_err)
 {
-    /* Execute all cached operations */
+    /* Execute all batched - cached operations */
     for(unsigned int i = 0; i < ops_cache.n_ops; i++)
     {
         switch(_exec_op(txn, &ops_cache.ops[i], out_err))
@@ -336,11 +358,11 @@ static void* _rw_cache_alloc(size_t size)
     }
 
     /* Ensure we do not overflow the fixed cache buffer. */
-    if(size > (DB_LMDB_RW_OPS_CACHE_SIZE - ops_cache.rw_cache_used))
+    if(size > (DB_RW_OPS_CACHE_SIZE - ops_cache.rw_cache_used))
     {
         EML_ERROR(LOG_TAG,
                   "_rw_cache_alloc: insufficient space (requested=%zu used=%zu capacity=%zu)", size,
-                  ops_cache.rw_cache_used, (size_t)DB_LMDB_RW_OPS_CACHE_SIZE);
+                  ops_cache.rw_cache_used, (size_t)DB_RW_OPS_CACHE_SIZE);
         return NULL;
     }
 
@@ -361,17 +383,18 @@ static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_er
         case DB_OPERATION_GET:
             ret = act_get(txn, op, out_err);
             /* If GET failed, propagate the safety decision. */
-            if(ret != DB_SAFETY_SUCCESS) return ret;
+            if(ret != DB_SAFETY_SUCCESS) goto fail;
 
-            /* In case of RW operation, after a GET, save the result into the cache buffer. */
+            /* In case of RW operation, after a GET, save the result into the cache buffer.
+            This is needed in case of other operation referencing this result */
             if(ops_cache.kind == OPS_BATCH_KIND_RW)
             {
                 /* At this point act_get() guarantees PRESENT with a valid pointer/size. */
-                if(!op->val.present.ptr || op->val.present.size == 0)
+                if(!op->val.present.data || op->val.present.size == 0)
                 {
                     EML_ERROR(LOG_TAG,
                               "_exec_op: GET returned invalid value descriptor (ptr=%p size=%zu)",
-                              op->val.present.ptr, op->val.present.size);
+                              op->val.present.data, op->val.present.size);
                     if(out_err) *out_err = -EIO;
                     return DB_SAFETY_FAIL;
                 }
@@ -385,8 +408,8 @@ static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_er
                 }
 
                 /* Copy the obtained value into the RW cache and repoint op->val to it. */
-                memcpy(dst, op->val.present.ptr, op->val.present.size);
-                op->val.present.ptr = dst;
+                memcpy(dst, op->val.present.data, op->val.present.size);
+                op->val.present.data = dst;
             }
 
             /* Value is now stable (either in user buffer or internal cache). */
@@ -402,4 +425,8 @@ static db_security_ret_code_t _exec_op(MDB_txn* txn, op_t* op, int* const out_er
             EML_ERROR(LOG_TAG, "_exec_op: invalid op type=%d", op->type);
             return DB_SAFETY_FAIL;
     }
+
+fail:
+    EML_ERROR(LOG_TAG, "_exec_op: failed");
+    return DB_SAFETY_FAIL;
 }

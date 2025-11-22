@@ -476,7 +476,6 @@ fail:
 static int _ensure_env_dir(const char* path)
 {
     struct stat st;
-    mode_t      dir_mode = (mode_t)0700; /* owner rwx, no group/other */
 
     if(stat(path, &st) == 0)
     {
@@ -507,10 +506,10 @@ static int _ensure_env_dir(const char* path)
     }
 
     /* Directory does not exist: create it with strict permissions. */
-    if(mkdir(path, dir_mode) != 0)
+    if(mkdir(path, DB_DIR_MODE) != 0)
     {
         int saved = errno;
-        EML_ERROR(LOG_TAG, "_ensure_env_dir: mkdir(%s, %o) failed, errno=%d", path, dir_mode,
+        EML_ERROR(LOG_TAG, "_ensure_env_dir: mkdir(%s, %o) failed, errno=%d", path, DB_DIR_MODE,
                   saved);
         return -saved;
     }

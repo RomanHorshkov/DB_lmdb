@@ -40,117 +40,6 @@ DataBase_t* DataBase = NULL;
  */
 /* None */
 
-static int _prepare_op_key_and_val(op_t* op, const op_type_t type, const void* key_data,
-                                   const size_t key_size, const void* val_data,
-                                   const size_t val_size)
-{
-    /* In any case key_size has to be != 0 */
-    if(key_size == 0)
-    {
-        EML_ERROR(LOG_TAG, "_prepare_op_key_and_val: invalid key size=0");
-        return -EINVAL;
-    }
-
-    /* switch the operation type */
-    switch(type)
-    {
-        case DB_OPERATION_PUT:
-            /* Put operation needs as well a clear val */
-            if(val_size == 0)
-            {
-                EML_ERROR(LOG_TAG, "_prepare_op_key_and_val: invalid val for PUT (size=0)");
-                return -EINVAL;
-            }
-
-            /* put value have been given by user */
-            if(val_data)
-            {
-                op->val.kind         = OP_KEY_KIND_PRESENT;
-                op->val.present.ptr  = (void*)val_data;
-                op->val.present.size = val_size;
-            }
-            else
-            {
-                op->val.kind            = OP_KEY_KIND_LOOKUP;
-                op->val.lookup.op_index = val_size;
-                /* TODO:
-            HARDCODED PATH. PUT ALLOWS LOOKING JUST 
-            FOR PREVIOUS -VAL- RESULT */
-                op->val.lookup.src_type = OP_KEY_SRC_VAL;
-            }
-
-            /* Set the key */
-            if(key_data)
-            {
-                op->key.kind         = OP_KEY_KIND_PRESENT;
-                op->key.present.ptr  = (void*)key_data;
-                op->key.present.size = key_size;
-            }
-            else
-            {
-                op->key.kind            = OP_KEY_KIND_LOOKUP;
-                op->key.lookup.op_index = key_size;
-                op->key.lookup.src_type = OP_KEY_SRC_KEY;
-            }
-
-            break;
-
-        case DB_OPERATION_GET:
-            /* Key resolution */
-            /* Key is given by the user */
-            if(key_data)
-            {
-                op->key.kind         = OP_KEY_KIND_PRESENT;
-                op->key.present.ptr  = (void*)key_data;
-                op->key.present.size = key_size;
-            }
-            /* Key is not given, has to be looked up */
-            else
-            {
-                op->key.kind            = OP_KEY_KIND_LOOKUP;
-                op->key.lookup.op_index = key_size;
-                op->key.lookup.src_type = OP_KEY_SRC_KEY;
-            }
-
-            /* Value handling:
-             * - When val_data is provided, treat it as a user buffer that
-             *   act_get() should copy into (PRESENT).
-             * - When val_data is NULL, this means "no user buffer"; act_get()
-             *   will populate op->val with an LMDB-backed view (PRESENT) on
-             *   success. */
-            if(val_data)
-            {
-                if(val_size == 0)
-                {
-                    EML_ERROR(LOG_TAG,
-                              "_prepare_op_key_and_val: invalid val_size=0 for GET with val_data");
-                    return -EINVAL;
-                }
-                /* User provided buffer for GET result. */
-                op->val.kind         = OP_KEY_KIND_PRESENT;
-                op->val.present.size = val_size;
-                op->val.present.ptr  = (void*)val_data;
-            }
-            else
-            {
-                /* No user buffer: let act_get() populate op->val with a
-                 * PRESENT descriptor that points into LMDB-managed memory. */
-                op->val.kind = OP_KEY_KIND_NONE;
-            }
-
-            break;
-
-        default:
-            EML_ERROR(LOG_TAG, "db_core_add_op: unsupported operation type=%d", type);
-            return -EINVAL;
-            break;
-    }
-
-    /* Set the operation type */
-    op->type = type;
-    return 0;
-}
-
 /****************************************************************************
  * PUBLIC FUNCTIONS DEFINITIONS
  ****************************************************************************
@@ -268,35 +157,37 @@ fail:
     return out_err_val;
 }
 
-int db_core_add_op(const unsigned dbi_idx, const op_type_t type, const void* key_data,
-                   const size_t key_size, const void* val_data, const size_t val_size)
+int db_core_set_op(const unsigned dbi_idx, const op_type_t type, op_key_t* key, op_key_t* val)
 {
     /* Validate global DB and DBI index */
     if(!DataBase || !DataBase->dbis || dbi_idx >= DataBase->n_dbis)
     {
-        EML_ERROR(LOG_TAG, "db_core_add_op: invalid db/dbi (db=%p idx=%u n_dbis=%zu)",
-                  (void*)DataBase, dbi_idx, DataBase ? DataBase->n_dbis : 0);
-        return -EINVAL;
+        EML_ERROR(LOG_TAG, "_set_op: invalid db/dbi (db=%p idx=%u n_dbis=%zu)", (void*)DataBase,
+                  dbi_idx, DataBase ? DataBase->n_dbis : 0);
+        return -ENOENT;
     }
+
+    /* Validate inputs */
+    if (type <= DB_OPERATION_NONE || type >= DB_OPERATION_MAX || !key || !val)
+    {
+        EML_ERROR(LOG_TAG, "_set_op: invalid input (type=%d key=%p val=%p)", (int)type,
+                  (void*)key, (void*)val);
+        return -EINVAL;
+    }    
 
     /* Get nex op */
     op_t* op = ops_get_next_op();
     if(!op)
     {
-        EML_ERROR(LOG_TAG, "db_core_add_op: ops_get_next_op failed");
+        EML_ERROR(LOG_TAG, "_set_op: _get_next_op failed");
         return -ENOMEM;
-    }
-
-    int res = _prepare_op_key_and_val(op, type, key_data, key_size, val_data, val_size);
-    if(res != 0)
-    {
-        EML_ERROR(LOG_TAG, "db_core_add_op: _prepare_op_key_and_val failed");
-        return res;
     }
 
     /* Assemble operation, shallow copied into ops cache */
     op->dbi  = dbi_idx;
     op->type = type;
+    op->key  = *key;
+    op->val  = *val;
 
     return ops_add_operation(op);
 }
@@ -365,7 +256,7 @@ size_t db_core_shutdown(void)
     free(DataBase);
     DataBase = NULL;
 
-    EML_INFO(LOG_TAG, "_shutdown: database shut down, final mapsize=%zu", final_mapsize);
+    EML_INFO(LOG_TAG, "_shutdown: shut down, final mapsize=%zu", final_mapsize);
 
     return final_mapsize;
 }

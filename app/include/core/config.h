@@ -29,13 +29,16 @@
 /* operation batch retry times */
 #define DB_LMDB_RETRY_OPS_EXEC    3
 
+/* number of operations per batch */
+#define DB_OPS_PER_BATCH              8
+
 /* operation batch RW cache size */
-#define DB_LMDB_RW_OPS_CACHE_SIZE KiB(2)
+#define DB_RW_OPS_CACHE_SIZE KiB(2)
 
 /* Default filesystem mode for LMDB environment files (data.mdb/lock.mdb). */
-#define DB_LMDB_ENV_MODE          0600u
+#define DB_ENV_MODE          0600u
 
 /* Default filesystem mode for LMDB environment directory (owner-only). */
-#define DB_LMDB_DIR_MODE          0700u
+#define DB_DIR_MODE          0700u
 
 #endif /* DB_LMDB_CONFIG_H */

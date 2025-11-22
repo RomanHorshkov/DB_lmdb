@@ -63,7 +63,7 @@ db_security_ret_code_t act_get(MDB_txn* txn, op_t* op, int* const out_err)
         /* Simulate a successful GET that populates op->val.present. */
         static char val[] = "X";
         op->val.kind         = OP_KEY_KIND_PRESENT;
-        op->val.present.ptr  = val;
+        op->val.present.data  = val;
         op->val.present.size = sizeof(val);
     }
     else if(g_next_get_rc == DB_SAFETY_RETRY)
@@ -122,10 +122,10 @@ static void test_rw_cache_alloc_beyond_capacity_fails(void** state)
 
     ut_reset_all();
 
-    ops_cache.rw_cache_used = DB_LMDB_RW_OPS_CACHE_SIZE - 4u;
+    ops_cache.rw_cache_used = DB_RW_OPS_CACHE_SIZE - 4u;
     void* p = _rw_cache_alloc(8u);
     assert_null(p);
-    assert_int_equal(ops_cache.rw_cache_used, DB_LMDB_RW_OPS_CACHE_SIZE - 4u);
+    assert_int_equal(ops_cache.rw_cache_used, DB_RW_OPS_CACHE_SIZE - 4u);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -186,7 +186,7 @@ static void test_exec_op_get_rw_caches_value(void** state)
     assert_int_equal(rc, DB_SAFETY_SUCCESS);
     assert_int_equal(err, 0);
     assert_int_equal(op.val.kind, OP_KEY_KIND_PRESENT);
-    assert_non_null(op.val.present.ptr);
+    assert_non_null(op.val.present.data);
     assert_true(ops_cache.rw_cache_used > 0u);
 }
 
@@ -277,7 +277,7 @@ static void test_ops_add_operation_updates_batch_kind_and_validates_lookup(void*
     /* First op: GET => RO batch. */
     op.type          = DB_OPERATION_GET;
     op.key.kind      = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = (void*)"k";
+    op.key.present.data  = (void*)"k";
     op.key.present.size = 1u;
 
     assert_int_equal(ops_add_operation(&op), 0);
@@ -316,7 +316,7 @@ static void test_ops_execute_operations_ro_uses_exec_ro_ops(void** state)
     memset(&op, 0, sizeof(op));
     op.type          = DB_OPERATION_GET;
     op.key.kind      = OP_KEY_KIND_PRESENT;
-    op.key.present.ptr  = (void*)"k";
+    op.key.present.data  = (void*)"k";
     op.key.present.size = 1u;
 
     assert_int_equal(ops_add_operation(&op), 0);
