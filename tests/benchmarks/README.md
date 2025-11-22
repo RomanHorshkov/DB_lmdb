@@ -137,6 +137,43 @@ This directory contains performance benchmarks for the LMDB database wrapper.
 ./build/bench_db_get_batch
 ```
 
+### bench_db_hardcore - 10M inserts + 100k random GETs
+
+**Purpose**: Stress-test a single appendable DBI with a massive workload:
+
+- Insert 10,000,000 users with strictly increasing keys (append fast-path), in batches of 8
+- Perform 100,000 random GETs against that DBI, also batched by 8
+- Measure total time for the full write phase and the full read phase, plus batch-level stats
+
+**What is measured**:
+
+- Total time spent in `db_core_set_op` + `db_core_exec_ops` for the insert and GET phases
+- Batch-level execution stats (mean/stddev/min/max) for each `db_core_exec_ops` call
+
+**Configuration**:
+
+- Inserts: 10,000,000 users
+- Random GETs: 100,000 lookups
+- Batch size: 8
+- Value size: 1 byte (zeroed)
+- DBI: single appendable DBI with ascending keys
+- Database path: `/tmp/bench_lmdb_hardcore`
+
+**Output**:
+
+- Console: compact summary of total times, throughput, and batch exec stats
+- File: `results/bench_hardcore.txt` with system info, configuration, and detailed metrics
+
+**Running**:
+
+```bash
+# Using the convenience script
+./utils/bench/hardcore_db.sh
+
+# Or directly
+./build/bench_db_hardcore
+```
+
 ## Results Format
 
 The benchmark outputs include:

@@ -45,6 +45,9 @@ jobs:
       - name: Run GET benchmark (read_db)
         run: ./utils/bench/read_db.sh
 
+      - name: Run HARDCORE benchmark
+        run: ./utils/bench/hardcore_db.sh
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
